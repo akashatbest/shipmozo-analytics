@@ -12,6 +12,7 @@ import BillingAudit from './components/BillingAudit'
 import AskAnything from './components/AskAnything'
 import UploadPage from './components/UploadPage'
 import SellerProfile from './components/SellerProfile'
+import PricingEngine from './components/PricingEngine'
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="ask" element={<AskAnything />} />
             <Route path="upload" element={<UploadPage />} />
             <Route path="seller/:userId" element={<SellerProfile />} />
+            <Route path="pricing-engine" element={<PricingEngine />} />
           </Route>
         </Routes>
       </MonthProvider>
