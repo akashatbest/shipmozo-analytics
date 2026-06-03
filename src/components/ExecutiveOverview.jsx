@@ -67,11 +67,11 @@ export default function ExecutiveOverview() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-7">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-7">
         {kpis.map(k => <KPICard key={k.label} {...k} />)}
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <ChartCard title="Monthly Orders">
           <Bar data={{ labels, datasets: [{ label:'Orders', data: all.map(m => m.total_orders), backgroundColor:'#3b82f6', borderRadius:5 }] }}
             options={barOpts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtNum(ctx.raw) } } } })} />
@@ -84,7 +84,7 @@ export default function ExecutiveOverview() {
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <ChartCard title="Margin % Trend">
           <Line data={{ labels, datasets: [{ label:'Margin %', data: all.map(m => m.margin_pct), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)', fill:true, tension:0.35, pointRadius:4 }] }}
             options={lineOpts({ scales: { y: { ticks: { callback: v => `${v}%` } } } })} />

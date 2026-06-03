@@ -55,7 +55,7 @@ export default function CourierPnL() {
         />
       )}
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <ChartCard title="Margin % by Courier">
           <Bar
             data={{

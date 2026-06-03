@@ -321,7 +321,7 @@ export default function AskAnything() {
             <p className="text-sm text-gray-500 mb-8 max-w-sm">
               Ask questions about your shipping data. I'll pull live numbers from your database to answer.
             </p>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
               {SUGGESTIONS.map(s => (
                 <button key={s.text} onClick={() => send(s.text)}
                   className="flex items-start gap-2 text-left px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm text-gray-700 group">

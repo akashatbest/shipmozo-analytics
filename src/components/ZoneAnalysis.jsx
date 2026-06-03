@@ -35,7 +35,7 @@ export default function ZoneAnalysis() {
       <PageHeader title="Zone Analysis" subtitle={fmtMonth(month)} />
 
       {/* Zone KPI strip */}
-      <div className="grid grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-6">
         {zones.map(z => (
           <div key={z.zone} className="rounded-xl p-4 relative overflow-hidden"
             style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
@@ -52,7 +52,7 @@ export default function ZoneAnalysis() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <ChartCard title="Order Distribution by Zone">
           <Doughnut
             data={{
@@ -74,7 +74,7 @@ export default function ZoneAnalysis() {
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <ChartCard title="RTO Rate by Zone">
           <Bar
             data={{

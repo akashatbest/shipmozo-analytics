@@ -81,7 +81,7 @@ export default function PriceCardAnalysis() {
       ) : (
         <>
           {/* Summary KPI strip */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <SummaryKPI label="Loss-making cards" value={negative.length}
               sub={`${fmtINR(totalLoss)} total loss`} color="red" />
             <SummaryKPI label="Thin margin (0–8%)" value={thin.length}
@@ -386,7 +386,7 @@ function DrillDown({ card, sellers }) {
           </div>
           <Badge pct={card.margin_pct} large />
         </div>
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
           {[
             { l:'Revenue', v:fmtINR(card.revenue_billed) },
             { l:'Courier Cost', v:fmtINR(card.courier_cost) },
@@ -403,7 +403,7 @@ function DrillDown({ card, sellers }) {
       </div>
 
       {/* Zone + top sellers side by side */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Zone Distribution</h3>
           <div className="space-y-2">

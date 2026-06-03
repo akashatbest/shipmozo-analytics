@@ -152,7 +152,7 @@ export default function SellerProfile() {
 
       {/* KPI row — latest month */}
       {latest && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[
             { label: `Orders (${fmtMonth(latest.month)})`, value: fmtNum(latest.orders), d: delta(latest.orders, prev?.orders) },
             { label: 'Revenue', value: fmtINR(latest.revenue_billed), d: delta(latest.revenue_billed, prev?.revenue_billed) },
@@ -185,7 +185,7 @@ export default function SellerProfile() {
 
       {/* Charts row */}
       {history.length > 1 && (
-        <div className="grid grid-cols-2 gap-5 mb-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
           <div className="rounded-xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-secondary)' }}>Monthly Orders</h3>
             <Bar
@@ -224,7 +224,7 @@ export default function SellerProfile() {
       )}
 
       {/* Revenue + Margin trend & Zone breakdown */}
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         {history.length > 1 && (
           <div className="rounded-xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
             <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-secondary)' }}>Revenue & Margin (₹L)</h3>

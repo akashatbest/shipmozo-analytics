@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { MonthSelector } from '../lib/monthContext'
 
 const NAV_GROUPS = [
@@ -11,20 +12,20 @@ const NAV_GROUPS = [
   {
     label: 'Analytics',
     items: [
-      { to: '/courier-pnl',  label: 'Courier P&L',    icon: TruckIcon },
-      { to: '/rto',          label: 'RTO Analytics',  icon: RTOIcon },
-      { to: '/zones',        label: 'Zone Analysis',  icon: MapIcon },
-      { to: '/billing',      label: 'Billing Audit',  icon: AuditIcon },
+      { to: '/courier-pnl',  label: 'Courier P&L',   icon: TruckIcon },
+      { to: '/rto',          label: 'RTO Analytics', icon: RTOIcon },
+      { to: '/zones',        label: 'Zone Analysis', icon: MapIcon },
+      { to: '/billing',      label: 'Billing Audit', icon: AuditIcon },
     ],
   },
   {
     label: 'Intelligence',
     items: [
-      { to: '/seller-health', label: 'Seller Health',      icon: HealthIcon },
-      { to: '/seller-intel',  label: 'Seller Intelligence', icon: IntelIcon },
-      { to: '/price-cards',    label: 'Price Cards',        icon: TagIcon },
-      { to: '/pricing-engine', label: 'Pricing Engine',     icon: EngineIcon },
-      { to: '/ask',           label: 'Ask AI',             icon: AIIcon },
+      { to: '/seller-health',  label: 'Seller Health',       icon: HealthIcon },
+      { to: '/seller-intel',   label: 'Seller Intelligence', icon: IntelIcon },
+      { to: '/price-cards',    label: 'Price Cards',         icon: TagIcon },
+      { to: '/pricing-engine', label: 'Pricing Engine',      icon: EngineIcon },
+      { to: '/ask',            label: 'Ask AI',              icon: AIIcon },
     ],
   },
   {
@@ -36,27 +37,53 @@ const NAV_GROUPS = [
 ]
 
 export default function Layout() {
+  const [open, setOpen] = useState(false)
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--color-bg)' }}>
 
-      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
-      <aside className="w-60 flex-shrink-0 flex flex-col" style={{ background: 'var(--sidebar-bg)' }}>
+      {/* ── Mobile backdrop ───────────────────────────────────────────────── */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
 
+      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
+      <aside
+        className={`
+          fixed md:relative inset-y-0 left-0 z-50 md:z-auto
+          w-64 flex-shrink-0 flex flex-col
+          transition-transform duration-200 ease-in-out
+          ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
+        style={{ background: 'var(--sidebar-bg)' }}
+      >
         {/* Brand */}
-        <div className="flex items-center gap-3 px-5 py-5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--color-primary)' }}>
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10" />
+        <div className="flex items-center justify-between px-5 py-5">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: 'var(--color-primary)' }}>
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m8 4v10" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white font-semibold text-sm leading-none">Shipmozo</p>
+              <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>Analytics</p>
+            </div>
+          </div>
+          {/* Close button — mobile only */}
+          <button onClick={() => setOpen(false)}
+            className="md:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            style={{ color: '#64748b' }}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </div>
-          <div>
-            <p className="text-white font-semibold text-sm leading-none">Shipmozo</p>
-            <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>Analytics</p>
-          </div>
+          </button>
         </div>
 
-        {/* Divider */}
         <div className="mx-4 mb-3" style={{ height: 1, background: 'rgba(255,255,255,0.07)' }} />
 
         {/* Nav */}
@@ -73,21 +100,17 @@ export default function Layout() {
                     key={to}
                     to={to}
                     end={to === '/'}
+                    onClick={() => setOpen(false)}
                     className={({ isActive }) => [
-                      'flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-                      isActive
-                        ? 'text-white'
-                        : 'text-slate-400 hover:text-slate-200',
+                      'relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
+                      isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
                     ].join(' ')}
-                    style={({ isActive }) => isActive
-                      ? { background: 'var(--sidebar-active)', color: '#93c5fd' }
-                      : {}}
+                    style={({ isActive }) => isActive ? { background: 'var(--sidebar-active)', color: '#93c5fd' } : {}}
                   >
                     {({ isActive }) => (
                       <>
                         {isActive && (
-                          <span className="absolute left-0 w-0.5 h-5 rounded-r-full"
-                            style={{ background: '#60a5fa' }} />
+                          <span className="absolute left-0 w-0.5 h-5 rounded-r-full" style={{ background: '#60a5fa' }} />
                         )}
                         <Icon className="w-4 h-4 flex-shrink-0" />
                         {label}
@@ -114,23 +137,34 @@ export default function Layout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Top bar */}
-        <header className="flex-shrink-0 h-14 flex items-center justify-between px-8"
+        <header className="flex-shrink-0 h-14 flex items-center justify-between px-4 md:px-8"
           style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)' }}>
-          <p className="text-xs font-semibold uppercase tracking-widest"
-            style={{ color: 'var(--color-text-muted)', letterSpacing: '0.12em' }}>
-            Shipmozo Analytics
-          </p>
-          <div className="flex items-center gap-4">
+
+          <div className="flex items-center gap-3">
+            {/* Hamburger — mobile only */}
+            <button onClick={() => setOpen(true)}
+              className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+              <svg className="w-5 h-5" style={{ color: 'var(--color-text-secondary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+            <p className="text-xs font-semibold uppercase tracking-widest hidden sm:block"
+              style={{ color: 'var(--color-text-muted)', letterSpacing: '0.12em' }}>
+              Shipmozo Analytics
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
             <MonthSelector />
             <div className="flex items-center gap-2 text-xs font-medium" style={{ color: '#16a34a' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Connected
+              <span className="hidden sm:inline">Connected</span>
             </div>
           </div>
         </header>
 
-        {/* Page */}
-        <main className="flex-1 overflow-y-auto px-8 py-7 animate-fade-in">
+        {/* Page content */}
+        <main className="flex-1 overflow-y-auto px-4 md:px-8 py-5 md:py-7 animate-fade-in">
           <Outlet />
         </main>
       </div>
@@ -138,7 +172,7 @@ export default function Layout() {
   )
 }
 
-/* ── Icons ───────────────────────────────────────────────────────────────────── */
+/* ── Icons ─────────────────────────────────────────────────────────────────── */
 
 function DashboardIcon({ className }) {
   return (

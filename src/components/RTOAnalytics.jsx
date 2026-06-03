@@ -57,14 +57,14 @@ export default function RTOAnalytics() {
     <div>
       <PageHeader title="RTO Analytics" subtitle={fmtMonth(month)} />
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total RTO Orders"   value={fmtNum(totalRto)}   accent="red" />
         <StatCard label="Overall RTO Rate"   value={fmtPct(totalOrders > 0 ? totalRto/totalOrders*100 : 0)} accent={totalRto/totalOrders*100 > 25 ? 'red' : 'amber'} />
         <StatCard label="Worst Courier"      value={couriers[0]?.courier ?? '—'} sub={fmtPct(couriers[0]?.rto_rate)} accent="red" />
         <StatCard label="Est. RTO Cost"      value={fmtINR(rtoCostEst)} sub="fwd + return charge" accent="amber" />
       </div>
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <ChartCard title="RTO Rate by Courier">
           <Bar
             data={{
@@ -86,7 +86,7 @@ export default function RTOAnalytics() {
         </ChartCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <ChartCard title="RTO Rate by Day of Week" subtitle="Sunday typically peaks — COD impulse returns">
           <Bar
             data={{

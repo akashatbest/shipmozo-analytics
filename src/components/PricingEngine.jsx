@@ -219,7 +219,7 @@ export default function PricingEngine() {
       </div>
 
       {/* Impact summary */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <ImpactCard label="Total Opportunity" value={fmtINR(totalImpact)} sub={`${recs.length} sellers · annually ${fmtINR(totalImpact * 12)}`} color="#2563eb" />
         {Object.entries(TYPE_META).map(([key, meta]) => (
           <ImpactCard key={key} label={`${meta.label} (${typeCounts[key]})`}

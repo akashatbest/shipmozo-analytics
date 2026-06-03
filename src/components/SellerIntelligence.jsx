@@ -86,7 +86,7 @@ export default function SellerIntelligence() {
       <PageHeader title="Seller Intelligence" subtitle={`${fmtMonth(month)} · ${sellers.length} active sellers`} />
 
       {/* Summary banners */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         {overpriced.length > 0 && (
           <div className="rounded-xl p-4" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
             <p className="text-sm font-semibold" style={{ color: '#92400e' }}>{overpriced.length} sellers overpriced (&gt;20% margin)</p>

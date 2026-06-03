@@ -2,9 +2,9 @@
 
 export function PageHeader({ title, subtitle, action }) {
   return (
-    <div className="flex items-start justify-between mb-7">
-      <div>
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>{title}</h1>
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+      <div className="min-w-0">
+        <h1 className="text-xl font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{title}</h1>
         {subtitle && (
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>
         )}

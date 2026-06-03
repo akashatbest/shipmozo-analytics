@@ -171,7 +171,7 @@ export default function SellerHealth() {
       )}
 
       {/* Risk summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         {(['red','amber','green']).map(key => {
           const s = RISK_STYLES[key]
           const labels = { red: 'High Risk', amber: 'At Risk', green: 'Healthy' }
@@ -192,7 +192,7 @@ export default function SellerHealth() {
       </div>
 
       {/* Revenue at risk summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div className="rounded-xl px-5 py-4" style={{ background:'var(--color-surface)', border:'1px solid var(--color-border)', boxShadow:'var(--shadow-sm)' }}>
           <p className="text-xs uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>Revenue at risk</p>
           <p className="text-2xl font-bold mt-1" style={{ color:'var(--color-text-primary)' }}>{fmtINR(totalAtRiskRev)}</p>

@@ -46,14 +46,14 @@ export default function BillingAudit() {
     <div>
       <PageHeader title="Billing Audit" subtitle={fmtMonth(month)} />
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard label="Weight Discrepancies" value={fmtNum(totalDisc)}       sub="orders with weight mismatch" accent="amber" />
         <StatCard label="Zone Mismatches"       value={fmtNum(overview?.zone_mismatch_count)} sub={`${mismatchRate}% of orders`} accent={+mismatchRate > 40 ? 'red' : 'amber'} alert={+mismatchRate > 40} />
         <StatCard label="Total Credit Notes"    value={fmtINR(totalCN)}        sub={`${fmtNum(creditNotes.reduce((a,c)=>a+(c.count??0),0))} claims`} accent="red" />
         <StatCard label="Overall Disc. Rate"    value={fmtPct(totalAudited > 0 ? totalDisc/totalAudited*100 : 0)} sub="across all couriers" accent="amber" />
       </div>
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
         <ChartCard title="Discrepancy Rate by Courier">
           <Bar
             data={{

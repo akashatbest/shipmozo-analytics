@@ -438,7 +438,7 @@ export default function UploadPage() {
           </div>
 
           {/* Info cards */}
-          <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
             {[
               { label: 'Expected columns', value: '22' },
               { label: 'Typical file size', value: '80–150 MB' },
@@ -477,7 +477,7 @@ export default function UploadPage() {
       {stage === 'confirm' && preview && (
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <h2 className="font-semibold text-gray-900 text-lg mb-4">Ready to upload</h2>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <Stat label="Detected month"    value={fmtMonth(preview.targetMonth)} />
             <Stat label="Total rows in file" value={preview.rowCount.toLocaleString('en-IN')} />
             <Stat label="Rows to be saved"  value={preview.rowCount.toLocaleString('en-IN')} />
@@ -561,7 +561,7 @@ export default function UploadPage() {
               <p className="text-sm text-gray-500">{result.month}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <Stat label="Total orders"    value={result.orders.toLocaleString()} />
             <Stat label="Revenue billed"  value={`₹${(result.revenue / 100000).toFixed(1)}L`} />
             <Stat label="Active sellers"  value={result.sellers.toLocaleString()} />
