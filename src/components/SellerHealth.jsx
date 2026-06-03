@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { PageHeader, TableCard, Spinner, EmptyState } from './ui'
+import { useMonth } from '../lib/monthContext'
+import { exportCSV, ExportButton } from '../lib/exportCSV.jsx'
 
 const PAGE_SIZE = 50
 
@@ -38,6 +41,8 @@ const MIN_ORDER_OPTIONS = [
 ]
 
 export default function SellerHealth() {
+  const { selectedMonth } = useMonth()
+  const navigate = useNavigate()
   const [rows, setRows]         = useState([])
   const [loading, setLoading]   = useState(true)
   const [search, setSearch]     = useState('')
@@ -46,13 +51,11 @@ export default function SellerHealth() {
   const [sortKey, setSortKey]   = useState('health_score')
   const [sortDir, setSortDir]   = useState('asc')
   const [page, setPage]         = useState(1)
-  const [month, setMonth]       = useState('')
 
   useEffect(() => {
+    if (!selectedMonth) return
     async function load() {
-      const { data: ov } = await supabase.from('monthly_overview').select('month').order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      setMonth(latest ?? '')
+      const latest = selectedMonth
 
       const { data: health } = await supabase
         .from('seller_health')
@@ -85,7 +88,7 @@ export default function SellerHealth() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [selectedMonth])
 
   // Filter + sort
   const filtered = (() => {
@@ -132,7 +135,13 @@ export default function SellerHealth() {
 
   return (
     <div>
-      <PageHeader title="Seller Health" subtitle={fmtMonth(month)} />
+      <PageHeader title="Seller Health" subtitle={fmtMonth(selectedMonth)}
+      action={<ExportButton onClick={() => exportCSV(`seller-health-${selectedMonth}`, filtered, [
+        { key:'name', label:'Seller' }, { key:'company_name', label:'Company' },
+        { key:'health_score', label:'Score' }, { key:'risk_level', label:'Risk' },
+        { key:'current_orders', label:'Orders' }, { key:'current_revenue', label:'Revenue' },
+        { key:'current_rto', label:'RTO %' }, { key:'primary_courier', label:'Courier' },
+      ])} />} />
 
       {/* How to read */}
       <div className="rounded-xl p-4 mb-5 flex items-start gap-3 text-sm"
@@ -278,9 +287,11 @@ export default function SellerHealth() {
 
                     {/* Seller + inline tags */}
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-sm" style={{ color:'var(--color-text-primary)' }}>
+                      <button onClick={() => navigate(`/seller/${r.user_id}`)}
+                        className="font-semibold text-sm text-left hover:underline"
+                        style={{ color: 'var(--color-primary)' }}>
                         {r.name || `Seller ${r.user_id}`}
-                      </p>
+                      </button>
                       <p className="text-xs mt-0.5 mb-2" style={{ color:'var(--color-text-muted)' }}>
                         {r.company_name || `ID: ${r.user_id}`}
                       </p>

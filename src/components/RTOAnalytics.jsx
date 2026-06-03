@@ -4,28 +4,27 @@ import { supabase } from '../lib/supabase'
 import '../lib/chartConfig'
 import { barOpts, fmtPct, fmtNum, fmtINR, fmtMonth, courierColor } from '../lib/chartConfig'
 import { PageHeader, StatCard, ChartCard, TableCard, Thead, Th, Td, MarginBadge, Spinner, EmptyState } from './ui'
+import { useMonth } from '../lib/monthContext'
 
 const DAYS_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
 export default function RTOAnalytics() {
+  const { selectedMonth: month } = useMonth()
   const [couriers, setCouriers]     = useState([])
   const [zones, setZones]           = useState([])
   const [daily, setDaily]           = useState([])
   const [topSellers, setTopSellers] = useState([])
-  const [month, setMonth]           = useState('')
   const [loading, setLoading]       = useState(true)
 
   useEffect(() => {
+    if (!month) return
     async function load() {
-      const { data: ov } = await supabase.from('monthly_overview').select('month').order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      if (!latest) { setLoading(false); return }
-      setMonth(latest)
+      setLoading(true)
       const [{ data: cd }, { data: zd }, { data: dd }, { data: sd }] = await Promise.all([
-        supabase.from('courier_monthly').select('courier,orders,rto_count,rto_rate,avg_charge').eq('month', latest).order('rto_rate', { ascending: false }),
-        supabase.from('zone_monthly').select('zone,orders,rto_count,rto_rate').eq('month', latest).order('rto_rate', { ascending: false }),
-        supabase.from('daily_summary').select('date,day_of_week,orders,rto_count,rto_rate').eq('month', latest).order('date'),
-        supabase.from('seller_monthly').select('user_id,name,orders,rto_count,rto_rate,avg_shipping_charge').eq('month', latest).order('rto_count', { ascending: false }).limit(15),
+        supabase.from('courier_monthly').select('courier,orders,rto_count,rto_rate,avg_charge').eq('month', month).order('rto_rate', { ascending: false }),
+        supabase.from('zone_monthly').select('zone,orders,rto_count,rto_rate').eq('month', month).order('rto_rate', { ascending: false }),
+        supabase.from('daily_summary').select('date,day_of_week,orders,rto_count,rto_rate').eq('month', month).order('date'),
+        supabase.from('seller_monthly').select('user_id,name,orders,rto_count,rto_rate,avg_shipping_charge').eq('month', month).order('rto_count', { ascending: false }).limit(15),
       ])
       setCouriers(cd ?? [])
       setZones(zd ?? [])
@@ -34,7 +33,7 @@ export default function RTOAnalytics() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [month])
 
   if (loading) return <Spinner />
   if (!couriers.length) return <EmptyState body="Upload a monthly CSV to see RTO analytics" />

@@ -4,29 +4,29 @@ import { supabase } from '../lib/supabase'
 import '../lib/chartConfig'
 import { barOpts, fmtINR, fmtPct, fmtNum, fmtMonth, courierColor } from '../lib/chartConfig'
 import { PageHeader, StatCard, ChartCard, TableCard, Thead, Th, Td, AlertBanner, MarginBadge, Spinner, EmptyState } from './ui'
+import { useMonth } from '../lib/monthContext'
+import { exportCSV, ExportButton } from '../lib/exportCSV.jsx'
 
 export default function CourierPnL() {
+  const { selectedMonth: month } = useMonth()
   const [couriers, setCouriers]         = useState([])
   const [serviceTypes, setServiceTypes] = useState([])
-  const [month, setMonth]               = useState('')
   const [loading, setLoading]           = useState(true)
 
   useEffect(() => {
+    if (!month) return
     async function load() {
-      const { data: ov } = await supabase.from('monthly_overview').select('month').order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      if (!latest) { setLoading(false); return }
-      setMonth(latest)
+      setLoading(true)
       const [{ data: cd }, { data: st }] = await Promise.all([
-        supabase.from('courier_monthly').select('*').eq('month', latest).order('orders', { ascending: false }),
-        supabase.from('service_type_monthly').select('*').eq('month', latest).order('orders', { ascending: false }),
+        supabase.from('courier_monthly').select('*').eq('month', month).order('orders', { ascending: false }),
+        supabase.from('service_type_monthly').select('*').eq('month', month).order('orders', { ascending: false }),
       ])
       setCouriers(cd ?? [])
       setServiceTypes(st ?? [])
       setLoading(false)
     }
     load()
-  }, [])
+  }, [month])
 
   if (loading) return <Spinner />
   if (!couriers.length) return <EmptyState body="Upload a monthly CSV to see courier P&L" />
@@ -35,9 +35,17 @@ export default function CourierPnL() {
   const labels = couriers.map(c => c.courier)
   const colors = labels.map(l => courierColor(l))
 
+  const EXPORT_COLS = [
+    { key:'courier', label:'Courier' }, { key:'orders', label:'Orders' },
+    { key:'revenue_billed', label:'Revenue' }, { key:'courier_cost', label:'Cost' },
+    { key:'margin', label:'Margin' }, { key:'margin_pct', label:'Margin %' },
+    { key:'rto_rate', label:'RTO %' }, { key:'avg_charge', label:'Avg Charge' },
+  ]
+
   return (
     <div>
-      <PageHeader title="Courier P&L" subtitle={fmtMonth(month)} />
+      <PageHeader title="Courier P&L" subtitle={fmtMonth(month)}
+        action={<ExportButton onClick={() => exportCSV(`courier-pnl-${month}`, couriers, EXPORT_COLS)} />} />
 
       {negativeMargin.length > 0 && (
         <AlertBanner

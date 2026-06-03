@@ -1,4 +1,5 @@
 import { HashRouter as BrowserRouter, Routes, Route } from 'react-router-dom'
+import { MonthProvider } from './lib/monthContext'
 import Layout from './components/Layout'
 import ExecutiveOverview from './components/ExecutiveOverview'
 import CourierPnL from './components/CourierPnL'
@@ -10,24 +11,28 @@ import ZoneAnalysis from './components/ZoneAnalysis'
 import BillingAudit from './components/BillingAudit'
 import AskAnything from './components/AskAnything'
 import UploadPage from './components/UploadPage'
+import SellerProfile from './components/SellerProfile'
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<ExecutiveOverview />} />
-          <Route path="courier-pnl" element={<CourierPnL />} />
-          <Route path="seller-health" element={<SellerHealth />} />
-          <Route path="seller-intel" element={<SellerIntelligence />} />
-          <Route path="price-cards" element={<PriceCardAnalysis />} />
-          <Route path="rto" element={<RTOAnalytics />} />
-          <Route path="zones" element={<ZoneAnalysis />} />
-          <Route path="billing" element={<BillingAudit />} />
-          <Route path="ask" element={<AskAnything />} />
-          <Route path="upload" element={<UploadPage />} />
-        </Route>
-      </Routes>
+      <MonthProvider>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<ExecutiveOverview />} />
+            <Route path="courier-pnl" element={<CourierPnL />} />
+            <Route path="seller-health" element={<SellerHealth />} />
+            <Route path="seller-intel" element={<SellerIntelligence />} />
+            <Route path="price-cards" element={<PriceCardAnalysis />} />
+            <Route path="rto" element={<RTOAnalytics />} />
+            <Route path="zones" element={<ZoneAnalysis />} />
+            <Route path="billing" element={<BillingAudit />} />
+            <Route path="ask" element={<AskAnything />} />
+            <Route path="upload" element={<UploadPage />} />
+            <Route path="seller/:userId" element={<SellerProfile />} />
+          </Route>
+        </Routes>
+      </MonthProvider>
     </BrowserRouter>
   )
 }

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { MonthSelector } from '../lib/monthContext'
 
 const NAV_GROUPS = [
   {
@@ -118,10 +119,12 @@ export default function Layout() {
             style={{ color: 'var(--color-text-muted)', letterSpacing: '0.12em' }}>
             Shipmozo Analytics
           </p>
-          <div className="flex items-center gap-2 text-xs font-medium"
-            style={{ color: '#16a34a' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Connected
+          <div className="flex items-center gap-4">
+            <MonthSelector />
+            <div className="flex items-center gap-2 text-xs font-medium" style={{ color: '#16a34a' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Connected
+            </div>
           </div>
         </header>
 

@@ -4,27 +4,26 @@ import { supabase } from '../lib/supabase'
 import '../lib/chartConfig'
 import { barOpts, doughnutOpts, fmtPct, fmtNum, fmtINR, fmtMonth } from '../lib/chartConfig'
 import { PageHeader, ChartCard, TableCard, Thead, Th, Td, Spinner, EmptyState } from './ui'
+import { useMonth } from '../lib/monthContext'
 
 const ZONE_COLORS = { A:'#10b981', B:'#3b82f6', C:'#f59e0b', D:'#f97316', E:'#ef4444' }
 const zoneColor = z => ZONE_COLORS[z] ?? '#64748b'
 
 export default function ZoneAnalysis() {
+  const { selectedMonth: month } = useMonth()
   const [zones, setZones]     = useState([])
-  const [month, setMonth]     = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!month) return
     async function load() {
-      const { data: ov } = await supabase.from('monthly_overview').select('month').order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      if (!latest) { setLoading(false); return }
-      setMonth(latest)
-      const { data: zd } = await supabase.from('zone_monthly').select('*').eq('month', latest).order('orders', { ascending: false })
+      setLoading(true)
+      const { data: zd } = await supabase.from('zone_monthly').select('*').eq('month', month).order('orders', { ascending: false })
       setZones(zd ?? [])
       setLoading(false)
     }
     load()
-  }, [])
+  }, [month])
 
   if (loading) return <Spinner />
   if (!zones.length) return <EmptyState body="Upload a monthly CSV to see zone analysis" />

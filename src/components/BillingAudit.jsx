@@ -4,35 +4,35 @@ import { supabase } from '../lib/supabase'
 import '../lib/chartConfig'
 import { barOpts, doughnutOpts, fmtPct, fmtNum, fmtINR, fmtMonth, courierColor } from '../lib/chartConfig'
 import { PageHeader, StatCard, ChartCard, TableCard, Thead, Th, Td, Spinner, EmptyState } from './ui'
+import { useMonth } from '../lib/monthContext'
 
 const CN_COLORS = { WEIGHT:'#f59e0b', LOST:'#ef4444', FREIGHT:'#3b82f6' }
 
 export default function BillingAudit() {
+  const { selectedMonth: month } = useMonth()
   const [weightAudit, setWeightAudit] = useState([])
   const [creditNotes, setCreditNotes] = useState([])
   const [overview, setOverview]       = useState(null)
-  const [month, setMonth]             = useState('')
   const [loading, setLoading]         = useState(true)
 
   useEffect(() => {
+    if (!month) return
     async function load() {
+      setLoading(true)
       const { data: ov } = await supabase
-        .from('monthly_overview').select('month,weight_discrepancy_count,zone_mismatch_count,total_orders,total_credit_note_amount')
-        .order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      if (!latest) { setLoading(false); return }
-      setMonth(latest)
-      setOverview(ov[0])
+        .from('monthly_overview').select('weight_discrepancy_count,zone_mismatch_count,total_orders,total_credit_note_amount')
+        .eq('month', month).single()
+      setOverview(ov)
       const [{ data: wa }, { data: cn }] = await Promise.all([
-        supabase.from('weight_audit_monthly').select('*').eq('month', latest).order('discrepancy_count', { ascending: false }),
-        supabase.from('credit_notes_monthly').select('*').eq('month', latest).order('total_amount', { ascending: false }),
+        supabase.from('weight_audit_monthly').select('*').eq('month', month).order('discrepancy_count', { ascending: false }),
+        supabase.from('credit_notes_monthly').select('*').eq('month', month).order('total_amount', { ascending: false }),
       ])
       setWeightAudit(wa ?? [])
       setCreditNotes(cn ?? [])
       setLoading(false)
     }
     load()
-  }, [])
+  }, [month])
 
   if (loading) return <Spinner />
   if (!weightAudit.length && !creditNotes.length) return <EmptyState body="Upload a monthly CSV to see billing audit" />

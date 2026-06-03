@@ -3,11 +3,13 @@ import { Bar } from 'react-chartjs-2'
 import { supabase } from '../lib/supabase'
 import '../lib/chartConfig'
 import { barOpts, fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
+import { useMonth } from '../lib/monthContext'
+import { exportCSV, ExportButton } from '../lib/exportCSV.jsx'
 
 export default function PriceCardAnalysis() {
+  const { selectedMonth: month } = useMonth()
   const [cards, setCards]       = useState([])
   const [sellers, setSellers]   = useState([])
-  const [month, setMonth]       = useState('')
   const [loading, setLoading]   = useState(true)
   const [view, setView]         = useState('action')   // action | all | zone
   const [drillCard, setDrillCard] = useState(null)
@@ -16,25 +18,22 @@ export default function PriceCardAnalysis() {
   const [sortDir, setSortDir]   = useState('desc')
 
   useEffect(() => {
+    if (!month) return
     async function load() {
-      const { data: ov } = await supabase
-        .from('monthly_overview').select('month').order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      if (!latest) { setLoading(false); return }
-      setMonth(latest)
+      setLoading(true)
 
       const [{ data: cd }, { data: sd }] = await Promise.all([
-        supabase.from('price_card_monthly').select('*').eq('month', latest).order('revenue_billed', { ascending: false }),
+        supabase.from('price_card_monthly').select('*').eq('month', month).order('revenue_billed', { ascending: false }),
         supabase.from('seller_monthly')
           .select('user_id,name,company_name,orders,revenue_billed,margin,margin_pct,rto_rate,price_card_id,primary_courier,primary_zone')
-          .eq('month', latest).order('orders', { ascending: false }),
+          .eq('month', month).order('orders', { ascending: false }),
       ])
       setCards(cd ?? [])
       setSellers(sd ?? [])
       setLoading(false)
     }
     load()
-  }, [])
+  }, [month])
 
   if (loading) return <Spinner />
   if (!cards.length) return <EmptyState />

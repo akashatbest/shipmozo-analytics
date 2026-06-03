@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { PageHeader, TableCard, Thead, Th, Td, MarginBadge, Spinner, EmptyState } from './ui'
+import { useMonth } from '../lib/monthContext'
+import { exportCSV, ExportButton } from '../lib/exportCSV.jsx'
 
 const TABS = [
   { key:'overpriced', label:'Competitor Risk',  count_key:'overpriced', desc:'Margin >20% — seller may be poached by a cheaper platform' },
@@ -12,18 +15,17 @@ const TABS = [
 ]
 
 export default function SellerIntelligence() {
+  const { selectedMonth: month } = useMonth()
+  const navigate = useNavigate()
   const [sellers, setSellers] = useState([])
-  const [month, setMonth]     = useState('')
   const [tab, setTab]         = useState('overpriced')
   const [search, setSearch]   = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!month) return
     async function load() {
-      const { data: ov } = await supabase.from('monthly_overview').select('month').order('month', { ascending: false }).limit(1)
-      const latest = ov?.[0]?.month
-      if (!latest) { setLoading(false); return }
-      setMonth(latest)
+      const latest = month
 
       let { data, error } = await supabase
         .from('seller_monthly')
@@ -46,7 +48,7 @@ export default function SellerIntelligence() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [month])
 
   if (loading) return <Spinner />
   if (!sellers.length) return <EmptyState body="Upload a monthly CSV to see seller intelligence" />
@@ -151,7 +153,11 @@ export default function SellerIntelligence() {
                 {list.map(s => (
                   <tr key={s.user_id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3">
-                      <p className="font-medium text-sm" style={{ color: 'var(--color-text-primary)' }}>{s.name || `Seller ${s.user_id}`}</p>
+                      <button onClick={() => navigate(`/seller/${s.user_id}`)}
+                        className="font-medium text-sm text-left hover:underline"
+                        style={{ color: 'var(--color-primary)' }}>
+                        {s.name || `Seller ${s.user_id}`}
+                      </button>
                       <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{s.company_name || `ID: ${s.user_id}`}</p>
                     </td>
                     <Td right>{fmtNum(s.orders)}</Td>
