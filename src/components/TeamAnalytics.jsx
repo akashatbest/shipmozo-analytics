@@ -154,12 +154,16 @@ export default function TeamAnalytics() {
     })
   }, [stats, search, sortKey, sortDir])
 
-  const totalMapped    = Object.keys(teamMap).length
-  const spocCount      = new Set(Object.values(teamMap).map(t => t.spoc).filter(Boolean)).size
-  const kamCount       = new Set(Object.values(teamMap).map(t => t.kam).filter(Boolean)).size
-  const totalRevenue   = stats.reduce((a, s) => a + s.total_revenue, 0)
-  const totalAtRiskRev = stats.reduce((a, s) => a + s.at_risk_revenue, 0)
-  const highRiskPeople = filtered.filter(s => s.at_risk_pct > 40)
+  const totalMapped       = Object.keys(teamMap).length
+  const spocCount         = new Set(Object.values(teamMap).map(t => t.spoc).filter(Boolean)).size
+  const kamCount          = new Set(Object.values(teamMap).map(t => t.kam).filter(Boolean)).size
+  const sellersWithKam    = Object.values(teamMap).filter(t => t.kam).length
+  const sellersWithSpoc   = Object.values(teamMap).filter(t => t.spoc).length
+  const kamCoveragePct    = totalMapped > 0 ? Math.round(sellersWithKam / totalMapped * 100) : 0
+  const totalRevenue      = stats.reduce((a, s) => a + s.total_revenue, 0)
+  const totalMargin       = stats.reduce((a, s) => a + s.total_margin, 0)
+  const totalAtRiskRev    = stats.reduce((a, s) => a + s.at_risk_revenue, 0)
+  const highRiskPeople    = filtered.filter(s => s.at_risk_pct > 40)
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
@@ -172,7 +176,8 @@ export default function TeamAnalytics() {
   const EXPORT_COLS = [
     { key:'name', label:ROLE_META[role].label }, { key:'total_sellers', label:'Sellers' },
     { key:'active_sellers', label:'Active Sellers' }, { key:'total_orders', label:'Orders' },
-    { key:'total_revenue', label:'Revenue' }, { key:'margin_pct', label:'Margin %' },
+    { key:'total_revenue', label:'Revenue' }, { key:'total_margin', label:'Margin ₹' },
+    { key:'margin_pct', label:'Margin %' },
     { key:'rto_rate', label:'RTO Rate %' }, { key:'at_risk_count', label:'At-Risk Sellers' },
     { key:'at_risk_revenue', label:'Revenue at Risk' }, { key:'rto_cost', label:'RTO Cost' },
   ]
@@ -212,12 +217,14 @@ export default function TeamAnalytics() {
       />
 
       {/* Summary KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {[
-          { l:'Total Revenue',    v:fmtINR(totalRevenue),    accent:'#2563eb' },
-          { l:'Revenue at Risk',  v:fmtINR(totalAtRiskRev),  accent:'#ef4444', sub:'if at-risk sellers churn' },
-          { l:`${ROLE_META[role].label}s Active`, v:filtered.length, accent:'#10b981' },
-          { l:'Sellers Mapped',  v:fmtNum(totalMapped),     accent:'#8b5cf6' },
+          { l:'Total Revenue',   v:fmtINR(totalRevenue),   accent:'#2563eb' },
+          { l:'Total Margin ₹',  v:fmtINR(totalMargin),    accent: totalMargin < 0 ? '#ef4444' : '#10b981',
+            sub: `${(totalRevenue > 0 ? totalMargin/totalRevenue*100 : 0).toFixed(1)}% margin rate` },
+          { l:'Revenue at Risk', v:fmtINR(totalAtRiskRev), accent:'#ef4444', sub:'if at-risk sellers churn' },
+          { l:`${ROLE_META[role].label}s Active`, v:filtered.length, accent:'#8b5cf6',
+            sub:`${role==='spoc' ? sellersWithSpoc : sellersWithKam} sellers assigned` },
         ].map(({ l, v, accent, sub }) => (
           <div key={l} className="relative overflow-hidden rounded-xl p-5"
             style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
@@ -231,6 +238,22 @@ export default function TeamAnalytics() {
           </div>
         ))}
       </div>
+
+      {/* KAM coverage gap explanation */}
+      {role === 'kam' && sellersWithKam < totalMapped && (
+        <div className="rounded-xl p-4 mb-4 flex items-start gap-3"
+          style={{ background: 'rgba(37,99,235,0.05)', border: '1px solid rgba(37,99,235,0.12)' }}>
+          <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-sm" style={{ color: '#1e40af' }}>
+            <strong>Why KAM revenue is lower than SPOC:</strong>
+            {' '}{fmtNum(sellersWithKam)} of {fmtNum(totalMapped)} sellers ({kamCoveragePct}%) have a KAM assigned.
+            {' '}{fmtNum(totalMapped - sellersWithKam)} sellers have no KAM — their revenue doesn't appear in any KAM's total.
+            {' '}Upload an updated mapping CSV with KAM filled in for all sellers to get full coverage.
+          </div>
+        </div>
+      )}
 
       {/* High-risk portfolio alert */}
       {highRiskPeople.length > 0 && (
@@ -291,6 +314,7 @@ export default function TeamAnalytics() {
                   ['active_sellers',  'Active'],
                   ['total_orders',    'Orders'],
                   ['total_revenue',   'Revenue'],
+                  ['total_margin',    'Margin ₹'],
                   ['margin_pct',      'Margin %'],
                   ['rto_rate',        'RTO Rate'],
                   ['rto_cost',        'RTO Cost'],
@@ -348,6 +372,11 @@ export default function TeamAnalytics() {
                       <td className="px-4 py-4 text-right" style={{ color: 'var(--color-text-secondary)' }}>{fmtNum(person.active_sellers)}</td>
                       <td className="px-4 py-4 text-right font-medium" style={{ color: 'var(--color-text-secondary)' }}>{fmtNum(person.total_orders)}</td>
                       <td className="px-4 py-4 text-right font-semibold" style={{ color: 'var(--color-text-primary)' }}>{fmtINR(person.total_revenue)}</td>
+
+                      {/* Margin ₹ */}
+                      <td className={`px-4 py-4 text-right text-sm font-semibold ${marginIsNeg ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {fmtINR(person.total_margin)}
+                      </td>
 
                       {/* Margin % */}
                       <td className="px-4 py-4 text-right">
@@ -410,7 +439,7 @@ export default function TeamAnalytics() {
                             <table className="w-full text-xs">
                               <thead>
                                 <tr style={{ background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border-2)' }}>
-                                  {['Seller','Orders','Revenue','Margin %','RTO %','RTO Cost','Health','Courier','Trend'].map(h => (
+                                  {['Seller','Orders','Revenue','Margin ₹','Margin %','RTO %','RTO Cost','Health','Courier','Trend'].map(h => (
                                     <th key={h} className="px-3 py-2 text-left font-medium" style={{ color: 'var(--color-text-muted)' }}>{h}</th>
                                   ))}
                                 </tr>
@@ -429,6 +458,9 @@ export default function TeamAnalytics() {
                                     </td>
                                     <td className="px-3 py-2" style={{ color: 'var(--color-text-secondary)' }}>{fmtNum(s.orders)}</td>
                                     <td className="px-3 py-2 font-medium" style={{ color: 'var(--color-text-primary)' }}>{fmtINR(s.revenue)}</td>
+                                    <td className={`px-3 py-2 font-semibold text-xs ${s.margin < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                      {fmtINR(s.margin)}
+                                    </td>
                                     <td className="px-3 py-2">
                                       <span className={`font-bold ${s.margin_pct < 0 ? 'text-red-600' : s.margin_pct < 8 ? 'text-amber-600' : s.margin_pct > 20 ? 'text-orange-600' : 'text-emerald-600'}`}>
                                         {s.margin_pct.toFixed(1)}%
@@ -463,7 +495,8 @@ export default function TeamAnalytics() {
                               onClick={e => { e.stopPropagation(); exportCSV(`${person.name.replace(/\s+/g,'-')}-sellers-${month}`, person.sellers, [
                                 { key:'name', label:'Seller' }, { key:'company_name', label:'Company' },
                                 { key:'orders', label:'Orders' }, { key:'revenue', label:'Revenue' },
-                                { key:'margin_pct', label:'Margin %' }, { key:'rto_rate', label:'RTO %' },
+                                { key:'margin', label:'Margin ₹' }, { key:'margin_pct', label:'Margin %' },
+                                { key:'rto_rate', label:'RTO %' },
                                 { key:'risk_level', label:'Health' }, { key:'primary_courier', label:'Courier' },
                               ]) }}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors hover:bg-slate-100"

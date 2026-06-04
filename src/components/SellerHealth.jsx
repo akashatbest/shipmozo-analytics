@@ -68,7 +68,7 @@ export default function SellerHealth() {
         for (let i = 0; i < ids.length; i += 100) {
           const { data: sm } = await supabase
             .from('seller_monthly')
-            .select('user_id,orders,revenue_billed,rto_count,rto_rate,avg_shipping_charge')
+            .select('user_id,orders,revenue_billed,margin,rto_count,rto_rate,avg_shipping_charge')
             .eq('month', latest).in('user_id', ids.slice(i, i + 100))
           for (const r of sm ?? []) revenueMap[r.user_id] = r
         }
@@ -81,6 +81,7 @@ export default function SellerHealth() {
         primary_courier: h.sellers?.primary_courier ?? '',
         current_orders:  revenueMap[h.user_id]?.orders ?? 0,
         current_revenue: revenueMap[h.user_id]?.revenue_billed ?? 0,
+        current_margin:  revenueMap[h.user_id]?.margin ?? 0,
         current_rto:     revenueMap[h.user_id]?.rto_rate ?? 0,
         rto_count:       revenueMap[h.user_id]?.rto_count ?? 0,
         avg_charge:      revenueMap[h.user_id]?.avg_shipping_charge ?? 0,
@@ -140,7 +141,8 @@ export default function SellerHealth() {
         { key:'name', label:'Seller' }, { key:'company_name', label:'Company' },
         { key:'health_score', label:'Score' }, { key:'risk_level', label:'Risk' },
         { key:'current_orders', label:'Orders' }, { key:'current_revenue', label:'Revenue' },
-        { key:'current_rto', label:'RTO %' }, { key:'primary_courier', label:'Courier' },
+        { key:'current_margin', label:'Margin ₹' }, { key:'current_rto', label:'RTO %' },
+        { key:'primary_courier', label:'Courier' },
       ])} />} />
 
       {/* How to read */}
@@ -253,6 +255,9 @@ export default function SellerHealth() {
                 <th className="px-4 py-3 text-right w-28">
                   <SortHeader col="current_revenue" right>Revenue</SortHeader>
                 </th>
+                <th className="px-4 py-3 text-right w-28">
+                  <SortHeader col="current_margin" right>Margin ₹</SortHeader>
+                </th>
                 <th className="px-4 py-3 text-right w-24">
                   <SortHeader col="current_rto" right>RTO %</SortHeader>
                 </th>
@@ -336,6 +341,11 @@ export default function SellerHealth() {
                     {/* Revenue */}
                     <td className="px-4 py-4 text-right text-sm font-medium" style={{ color:'var(--color-text-secondary)' }}>
                       {fmtINR(r.current_revenue)}
+                    </td>
+
+                    {/* Margin ₹ */}
+                    <td className={`px-4 py-4 text-right text-sm font-semibold ${(r.current_margin ?? 0) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {r.current_margin !== 0 ? fmtINR(r.current_margin) : <span style={{ color:'var(--color-border)' }}>—</span>}
                     </td>
 
                     {/* RTO % */}
