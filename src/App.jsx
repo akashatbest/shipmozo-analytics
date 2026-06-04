@@ -9,6 +9,7 @@ import SellerHealth from './components/SellerHealth'
 import SellerIntelligence from './components/SellerIntelligence'
 import PriceCardAnalysis from './components/PriceCardAnalysis'
 import PricingEngine from './components/PricingEngine'
+import TeamAnalytics from './components/TeamAnalytics'
 import RTOAnalytics from './components/RTOAnalytics'
 import ZoneAnalysis from './components/ZoneAnalysis'
 import BillingAudit from './components/BillingAudit'
@@ -48,6 +49,7 @@ function AppContent() {
           <Route path="zones" element={<ZoneAnalysis />} />
           <Route path="billing" element={<BillingAudit />} />
           <Route path="ask" element={<AskAnything />} />
+          <Route path="team" element={<TeamAnalytics />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="seller/:userId" element={<SellerProfile />} />
         </Route>

@@ -587,6 +587,9 @@ export default function UploadPage() {
         </div>
       )}
 
+      {/* ── TEAM MAPPING UPLOAD ── */}
+      <TeamMappingUpload />
+
       {/* ── UPLOAD HISTORY ── */}
       {uploadHistory.length > 0 && (
         <div className="mt-10">
@@ -639,6 +642,159 @@ export default function UploadPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Team Mapping Upload ───────────────────────────────────────────────────────
+
+function TeamMappingUpload() {
+  const [file, setFile]         = useState(null)
+  const [status, setStatus]     = useState('idle') // idle | uploading | done | error
+  const [result, setResult]     = useState(null)
+  const [error, setError]       = useState('')
+  const [count, setCount]       = useState(0)
+  const inputRef                = useRef(null)
+
+  useEffect(() => {
+    supabase.from('seller_team').select('user_id', { count: 'exact', head: true })
+      .then(({ count: c }) => setCount(c ?? 0))
+  }, [])
+
+  async function handleUpload() {
+    if (!file) return
+    setStatus('uploading')
+    setError('')
+
+    return new Promise((resolve) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async ({ data }) => {
+          try {
+            // Validate columns
+            const headers = Object.keys(data[0] ?? {})
+            const hasUserId = headers.some(h => h.toLowerCase().includes('user') && h.toLowerCase().includes('id'))
+            const hasSpoc   = headers.some(h => h.toLowerCase().includes('spoc'))
+            const hasKam    = headers.some(h => h.toLowerCase().includes('kam'))
+            if (!hasUserId || !hasSpoc || !hasKam) {
+              throw new Error(`CSV must have columns: User Id, SPOC, KAM. Found: ${headers.join(', ')}`)
+            }
+
+            // Find actual column names (case-insensitive)
+            const userIdCol = headers.find(h => h.toLowerCase().includes('user') && h.toLowerCase().includes('id'))
+            const spocCol   = headers.find(h => h.toLowerCase().includes('spoc'))
+            const kamCol    = headers.find(h => h.toLowerCase().includes('kam'))
+
+            const rows = data
+              .map(r => ({
+                user_id: parseInt(String(r[userIdCol] ?? '').trim(), 10),
+                spoc:    String(r[spocCol] ?? '').trim() || null,
+                kam:     String(r[kamCol]  ?? '').trim() || null,
+              }))
+              .filter(r => !isNaN(r.user_id))
+
+            if (!rows.length) throw new Error('No valid rows found in the file.')
+
+            // Batch upsert
+            const BATCH = 500
+            for (let i = 0; i < rows.length; i += BATCH) {
+              const { error: err } = await supabase.from('seller_team').upsert(rows.slice(i, i + BATCH), { onConflict: 'user_id' })
+              if (err) throw new Error(err.message)
+            }
+
+            setResult({ uploaded: rows.length })
+            setCount(rows.length)
+            setStatus('done')
+          } catch (e) {
+            setError(e.message)
+            setStatus('error')
+          }
+          resolve()
+        },
+        error: (e) => { setError(e.message); setStatus('error'); resolve() },
+      })
+    })
+  }
+
+  return (
+    <div className="mt-10">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Team Mapping
+          </h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            Upload SPOC &amp; KAM assignments · CSV format: <code className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}>User Id, SPOC, KAM</code>
+          </p>
+        </div>
+        {count > 0 && (
+          <span className="text-sm font-medium px-3 py-1 rounded-full"
+            style={{ background: 'rgba(16,185,129,0.1)', color: '#059669', border: '1px solid rgba(16,185,129,0.2)' }}>
+            {count.toLocaleString('en-IN')} sellers mapped
+          </span>
+        )}
+      </div>
+
+      <div className="rounded-xl p-5" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-sm)' }}>
+        {status !== 'done' ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <input ref={inputRef} type="file" accept=".csv" className="hidden"
+              onChange={e => { setFile(e.target.files[0]); setStatus('idle'); setError('') }} />
+            <button onClick={() => inputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+              style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+              </svg>
+              {file ? file.name : 'Choose CSV file'}
+            </button>
+
+            {file && status !== 'uploading' && (
+              <button onClick={handleUpload}
+                className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-all"
+                style={{ background: 'var(--color-primary)' }}>
+                Upload mapping
+              </button>
+            )}
+
+            {status === 'uploading' && (
+              <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+                Uploading…
+              </div>
+            )}
+
+            {status === 'error' && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+
+            {!file && (
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                Uploads merge with existing data — existing mappings are updated, new ones added.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-700">Mapping uploaded successfully</p>
+                <p className="text-xs text-emerald-600">{result?.uploaded?.toLocaleString('en-IN')} seller assignments saved</p>
+              </div>
+            </div>
+            <button onClick={() => { setStatus('idle'); setFile(null); setResult(null) }}
+              className="text-xs hover:underline" style={{ color: 'var(--color-text-muted)' }}>
+              Upload another
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
