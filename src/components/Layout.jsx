@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { MonthSelector } from '../lib/monthContext'
+import { useAuth } from '../lib/auth'
 
 const NAV_GROUPS = [
   {
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
 
 export default function Layout() {
   const [open, setOpen] = useState(false)
+  const { user, signOut } = useAuth()
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--color-bg)' }}>
@@ -125,11 +127,29 @@ export default function Layout() {
 
         {/* Footer */}
         <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-            <p className="text-xs" style={{ color: '#475569' }}>Connected to Supabase</p>
+          {/* User info */}
+          {user && (
+            <p className="text-xs mb-2 truncate" style={{ color: '#475569' }} title={user.email}>
+              {user.email}
+            </p>
+          )}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+              <p className="text-xs" style={{ color: '#334155' }}>v0.1.0</p>
+            </div>
+            <button
+              onClick={signOut}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors hover:bg-red-900/30"
+              style={{ color: '#64748b' }}
+              title="Sign out"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+              </svg>
+              Sign out
+            </button>
           </div>
-          <p className="text-xs mt-0.5" style={{ color: '#334155' }}>v0.1.0</p>
         </div>
       </aside>
 
