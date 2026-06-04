@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllPaged } from '../lib/supabase'
 import { fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { PageHeader, TableCard, Thead, Th, Td, MarginBadge, Spinner, EmptyState } from './ui'
 import { useMonth } from '../lib/monthContext'
@@ -26,21 +26,22 @@ export default function SellerIntelligence() {
     if (!month) return
     async function load() {
       const latest = month
+      const COLS_FULL = 'user_id,name,company_name,orders,revenue_billed,courier_cost,margin,rto_count,rto_rate,avg_shipping_charge,primary_courier,primary_zone,price_card_id,credit_note_count,credit_note_amount,weight_discrepancy_count'
+      const COLS_FALLBACK = 'user_id,name,company_name,orders,revenue_billed,courier_cost,margin,rto_count,rto_rate,avg_shipping_charge,primary_courier,primary_zone,credit_note_count,credit_note_amount,weight_discrepancy_count'
 
-      let { data, error } = await supabase
-        .from('seller_monthly')
-        .select('user_id,name,company_name,orders,revenue_billed,courier_cost,margin,rto_count,rto_rate,avg_shipping_charge,primary_courier,primary_zone,price_card_id,credit_note_count,credit_note_amount,weight_discrepancy_count')
-        .eq('month', latest).order('revenue_billed', { ascending: false })
-
-      if (error) {
-        const { data: fb } = await supabase
-          .from('seller_monthly')
-          .select('user_id,name,company_name,orders,revenue_billed,courier_cost,margin,rto_count,rto_rate,avg_shipping_charge,primary_courier,primary_zone,credit_note_count,credit_note_amount,weight_discrepancy_count')
-          .eq('month', latest).order('revenue_billed', { ascending: false })
-        data = fb
+      let data
+      try {
+        data = await fetchAllPaged(() => supabase
+          .from('seller_monthly').select(COLS_FULL)
+          .eq('month', latest).order('revenue_billed', { ascending: false }))
+      } catch {
+        // price_card_id column may not exist yet — retry without it
+        data = await fetchAllPaged(() => supabase
+          .from('seller_monthly').select(COLS_FALLBACK)
+          .eq('month', latest).order('revenue_billed', { ascending: false }))
       }
 
-      const enriched = (data ?? []).map(s => ({
+      const enriched = data.map(s => ({
         ...s,
         margin_pct: s.revenue_billed > 0 ? Math.round((s.margin / s.revenue_billed) * 10000) / 100 : 0,
       }))

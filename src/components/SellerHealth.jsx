@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllPaged } from '../lib/supabase'
 import { fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { PageHeader, TableCard, Spinner, EmptyState } from './ui'
 import { useMonth } from '../lib/monthContext'
@@ -57,24 +57,23 @@ export default function SellerHealth() {
     async function load() {
       const latest = selectedMonth
 
-      const { data: health } = await supabase
+      // seller_health can exceed 1000 rows — page through the full set
+      const health = await fetchAllPaged(() => supabase
         .from('seller_health')
         .select('user_id,health_score,risk_level,volume_trend,rto_trend,revenue_at_risk,sellers!inner(name,company_name,primary_courier)')
-        .order('health_score', { ascending: true })
+        .order('health_score', { ascending: true }))
 
+      // Pull the month's metrics for all sellers in one paged sweep, then index
       let revenueMap = {}
-      if (latest && health?.length) {
-        const ids = health.map(h => h.user_id)
-        for (let i = 0; i < ids.length; i += 100) {
-          const { data: sm } = await supabase
-            .from('seller_monthly')
-            .select('user_id,orders,revenue_billed,margin,rto_count,rto_rate,avg_shipping_charge')
-            .eq('month', latest).in('user_id', ids.slice(i, i + 100))
-          for (const r of sm ?? []) revenueMap[r.user_id] = r
-        }
+      if (latest && health.length) {
+        const sm = await fetchAllPaged(() => supabase
+          .from('seller_monthly')
+          .select('user_id,orders,revenue_billed,margin,rto_count,rto_rate,avg_shipping_charge')
+          .eq('month', latest))
+        revenueMap = Object.fromEntries(sm.map(r => [r.user_id, r]))
       }
 
-      setRows((health ?? []).map(h => ({
+      setRows(health.map(h => ({
         ...h,
         name:            h.sellers?.name ?? '',
         company_name:    h.sellers?.company_name ?? '',

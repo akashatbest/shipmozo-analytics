@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllPaged } from '../lib/supabase'
 import { fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { useMonth } from '../lib/monthContext'
 import { PageHeader, Spinner, EmptyState } from './ui'
@@ -120,18 +120,19 @@ export default function TeamAnalytics() {
     if (!month) return
     async function load() {
       setLoading(true)
-      const [{ data: team }, { data: sm }, { data: sh }] = await Promise.all([
-        supabase.from('seller_team').select('user_id,spoc,kam'),
-        supabase.from('seller_monthly')
+      // All three tables can exceed 1000 rows — page through the full sets
+      const [team, sm, sh] = await Promise.all([
+        fetchAllPaged(() => supabase.from('seller_team').select('user_id,spoc,kam')),
+        fetchAllPaged(() => supabase.from('seller_monthly')
           .select('user_id,name,company_name,orders,revenue_billed,margin,rto_count,rto_rate,avg_shipping_charge,primary_courier,primary_zone')
-          .eq('month', month),
-        supabase.from('seller_health')
-          .select('user_id,health_score,risk_level,volume_trend'),
+          .eq('month', month)),
+        fetchAllPaged(() => supabase.from('seller_health')
+          .select('user_id,health_score,risk_level,volume_trend')),
       ])
-      const map = Object.fromEntries((team ?? []).map(t => [String(t.user_id), t]))
+      const map = Object.fromEntries(team.map(t => [String(t.user_id), t]))
       setTeamMap(map)
-      setSellerMonthly(sm ?? [])
-      setSellerHealth(sh ?? [])
+      setSellerMonthly(sm)
+      setSellerHealth(sh)
       setLoading(false)
     }
     load()

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllPaged } from '../lib/supabase'
 import { fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { useMonth } from '../lib/monthContext'
 import { PageHeader, Spinner, EmptyState } from './ui'
@@ -126,16 +126,17 @@ export default function PricingEngine() {
     if (!month) return
     async function load() {
       setLoading(true)
-      const [{ data: sd }, { data: cd }] = await Promise.all([
-        supabase.from('seller_monthly')
+      const [sd, cd] = await Promise.all([
+        // seller_monthly can be 5000+ rows — page through all
+        fetchAllPaged(() => supabase.from('seller_monthly')
           .select('user_id,name,company_name,orders,revenue_billed,margin,zone_a_pct,zone_b_pct,zone_c_pct,zone_d_pct,zone_e_pct,price_card_id,primary_zone,primary_courier')
-          .eq('month', month).order('revenue_billed', { ascending: false }),
-        supabase.from('price_card_monthly')
+          .eq('month', month).order('revenue_billed', { ascending: false })),
+        fetchAllPaged(() => supabase.from('price_card_monthly')
           .select('price_card_id,orders,seller_count,revenue_billed,courier_cost,margin,margin_pct,zone_a_orders,zone_b_orders,zone_c_orders,zone_d_orders,zone_e_orders,avg_weight')
-          .eq('month', month),
+          .eq('month', month)),
       ])
-      setSellers(sd ?? [])
-      setCards(cd ?? [])
+      setSellers(sd)
+      setCards(cd)
       setLoading(false)
     }
     load()

@@ -686,11 +686,18 @@ function TeamMappingUpload() {
             const spocCol   = headers.find(h => h.toLowerCase().includes('spoc'))
             const kamCol    = headers.find(h => h.toLowerCase().includes('kam'))
 
+            // Normalise a field: treat empty, "N/A", "n/a", "-" as null
+            const clean = v => {
+              const s = String(v ?? '').trim()
+              if (!s || s.toLowerCase() === 'n/a' || s === '-') return null
+              return s
+            }
+
             const rows = data
               .map(r => ({
                 user_id: parseInt(String(r[userIdCol] ?? '').trim(), 10),
-                spoc:    String(r[spocCol] ?? '').trim() || null,
-                kam:     String(r[kamCol]  ?? '').trim() || null,
+                spoc:    clean(r[spocCol]),
+                kam:     clean(r[kamCol]),
               }))
               .filter(r => !isNaN(r.user_id))
 

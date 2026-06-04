@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Bar } from 'react-chartjs-2'
-import { supabase } from '../lib/supabase'
+import { supabase, fetchAllPaged } from '../lib/supabase'
 import '../lib/chartConfig'
 import { barOpts, fmtINR, fmtPct, fmtNum, fmtMonth } from '../lib/chartConfig'
 import { useMonth } from '../lib/monthContext'
@@ -22,14 +22,21 @@ export default function PriceCardAnalysis() {
     async function load() {
       setLoading(true)
 
-      const [{ data: cd }, { data: sd }] = await Promise.all([
-        supabase.from('price_card_monthly').select('*').eq('month', month).order('revenue_billed', { ascending: false }),
-        supabase.from('seller_monthly')
-          .select('user_id,name,company_name,orders,revenue_billed,margin,margin_pct,rto_rate,price_card_id,primary_courier,primary_zone')
-          .eq('month', month).order('orders', { ascending: false }),
+      const [cd, sd] = await Promise.all([
+        // price_card_monthly is ~hundreds of rows but page anyway for safety
+        fetchAllPaged(() => supabase.from('price_card_monthly').select('*')
+          .eq('month', month).order('revenue_billed', { ascending: false })),
+        // seller_monthly can be 5000+ rows — must page through all
+        fetchAllPaged(() => supabase.from('seller_monthly')
+          .select('user_id,name,company_name,orders,revenue_billed,margin,rto_rate,price_card_id,primary_courier,primary_zone')
+          .eq('month', month).order('orders', { ascending: false })),
       ])
-      setCards(cd ?? [])
-      setSellers(sd ?? [])
+      setCards(cd)
+      // margin_pct isn't a stored column on seller_monthly — compute it
+      setSellers(sd.map(s => ({
+        ...s,
+        margin_pct: s.revenue_billed > 0 ? (s.margin / s.revenue_billed) * 100 : 0,
+      })))
       setLoading(false)
     }
     load()
