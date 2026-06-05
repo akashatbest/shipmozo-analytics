@@ -166,19 +166,19 @@ export default function BillingAudit() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-sm" style={{ color:'#1e40af' }}>
-              <strong>How financial impact is estimated:</strong> For each courier, we compute
-              <em> rate per kg = avg charge ÷ avg weight</em>, then
-              <em> estimated extra charge = discrepancy count × avg overcharge kg × rate per kg</em>.
-              This is directional — actual recovery depends on the courier's dispute process.
+              <strong>What is a weight discrepancy?</strong> Sellers declare a weight when creating a shipment (label weight = <em>Courier Invoice Weight</em>).
+              The courier then weighs the actual package and bills for the higher weight (<em>Charged Weight</em>).
+              The gap — <em>Charged Weight − Courier Invoice Weight</em> — is always a loss for Shipmozo since we pay the courier more than what was agreed.
+              Financial impact is estimated as: <em>discrepancy count × avg extra kg × rate per kg (avg charge ÷ avg weight)</em>.
             </p>
           </div>
 
           {/* Summary KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <StatCard label="Total Discrepancies"   value={fmtNum(totalDiscrepancies)} sub={`of ${fmtNum(totalAudited)} audited`} accent="amber" />
-            <StatCard label="Est. Extra Charged ₹"  value={fmtINR(totalEstOvercharge)} sub="by couriers (overcharge)" accent="red" />
-            <StatCard label="Est. Undercharged ₹"   value={fmtINR(totalEstUndercharge)} sub="courier charged less" accent="green" />
-            <StatCard label="Net Impact ₹"          value={fmtINR(Math.abs(netWeightImpact))} sub={netWeightImpact > 0 ? '🔴 Shipmozo overpaid' : '🟢 Net undercharged'} accent={netWeightImpact > 0 ? 'red' : 'green'} />
+            <StatCard label="Total Discrepancies"   value={fmtNum(totalDiscrepancies)} sub={`${fmtPct(totalAudited > 0 ? totalDiscrepancies/totalAudited*100 : 0)} of all orders`} accent="amber" />
+            <StatCard label="Est. Loss ₹"           value={fmtINR(totalEstOvercharge)} sub="courier over-billed vs agreed weight" accent="red" />
+            <StatCard label="Avg Loss per Order"    value={`₹${totalDiscrepancies > 0 ? (totalEstOvercharge / totalDiscrepancies).toFixed(1) : 0}`} sub="extra charged per discrepant order" accent="red" />
+            <StatCard label="Recoverable ₹"         value={fmtINR(totalEstOvercharge)} sub="total disputable with couriers" accent="amber" />
           </div>
 
           {/* Charts */}
@@ -220,8 +220,8 @@ export default function BillingAudit() {
               <table className="w-full text-sm">
                 <Thead>
                   <Th>Courier</Th><Th right>Audited</Th><Th right>Discrepancies</Th><Th right>Rate</Th>
-                  <Th right>Avg Overcharge</Th><Th right>Rate/kg</Th>
-                  <Th right>Est. Extra Charged</Th><Th right>Est. Undercharged</Th><Th right>Net Impact</Th>
+                  <Th right>Avg Extra (kg)</Th><Th right>Rate/kg</Th>
+                  <Th right>Est. Loss ₹</Th><Th right>Avg Loss/Order</Th>
                 </Thead>
                 <tbody className="divide-y" style={{ borderColor:'var(--color-border-2)' }}>
                   {weightCalc.sort((a,b) => b.estOvercharge - a.estOvercharge).map(w => (
@@ -241,10 +241,9 @@ export default function BillingAudit() {
                       </td>
                       <Td right>{w.avg_overcharge_kg?.toFixed(3)} kg</Td>
                       <Td right>₹{w.ratePerKg.toFixed(1)}/kg</Td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-red-600">{fmtINR(w.estOvercharge)}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-emerald-600">{fmtINR(w.estUndercharge)}</td>
-                      <td className={`px-4 py-3 text-right text-sm font-bold ${w.netImpact > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                        {w.netImpact > 0 ? '+' : ''}{fmtINR(w.netImpact)}
+                      <td className="px-4 py-3 text-right text-sm font-bold text-red-600">{fmtINR(w.estOvercharge)}</td>
+                      <td className="px-4 py-3 text-right text-sm" style={{ color:'var(--color-text-secondary)' }}>
+                        {w.discrepancy_count > 0 ? `₹${(w.estOvercharge / w.discrepancy_count).toFixed(0)}` : '—'}
                       </td>
                     </tr>
                   ))}

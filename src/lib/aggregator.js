@@ -74,21 +74,26 @@ export function aggregateCSV(rows, targetMonth) {
     const courierZone = str(row['Courier Zone'])
     const usedZone    = courierZone || zone
     const isRto          = str(row['Rto']).toUpperCase() === 'YES'
-    const chargedWeight  = num(row['Charged Weight'])          // weight Shipmozo agreed to bill seller
-    const invoiceWeight  = num(row['Courier Invoice Weight'])  // weight courier actually billed Shipmozo
+    // Courier Invoice Weight = weight on the courier's invoice TO Shipmozo (courier's measurement) → HIGHER
+    // Charged Weight         = weight the seller declared when creating the shipment form → LOWER
+    //
+    // Discrepancy = Courier Invoice Weight > Charged Weight
+    // This is always a LOSS for Shipmozo: courier billed more than the seller declared
+    // Loss per order = Courier Invoice Weight − Charged Weight
+    const invoiceWeight  = num(row['Courier Invoice Weight'])  // courier's measured/billed weight (higher)
+    const chargedWeight  = num(row['Charged Weight'])          // seller's declared weight (lower)
     const cnReason       = str(row['Credit Note Reason'])
     const cnAmount       = num(row['Credit Note Amount'])
     const dateStr        = d ? toDateStr(d) : null
     const dow            = d ? DAYS[d.getDay()] : null
 
-    // Discrepancy = courier invoiced a DIFFERENT weight than what was charged
-    // Formula: Courier Invoice Weight vs Charged Weight  (NOT Courier Weight column)
-    const hasWeightDisc   = invoiceWeight > 0 && chargedWeight > 0 && Math.abs(invoiceWeight - chargedWeight) > 0.1
-    const weightDiff      = invoiceWeight - chargedWeight  // positive = courier over-billed
+    // Discrepancy exists when courier invoice weight > seller's declared charged weight
+    const hasWeightDisc   = invoiceWeight > 0 && chargedWeight > 0 && invoiceWeight > chargedWeight
+    const weightDiff      = invoiceWeight - chargedWeight  // always positive = Shipmozo's loss per order
     const hasZoneMismatch = zone && courierZone && zone !== courierZone
 
-    // Use invoiceWeight for weight-related aggregations (it's the billable weight per courier)
-    const charged = invoiceWeight || chargedWeight  // fallback to chargedWeight if invoice not available
+    // Use courier invoice weight (higher) as the actual shipped weight for rate calculations
+    const charged = invoiceWeight || chargedWeight
 
     // ── Overview ──────────────────────────────────────────────────────────
     totalOrders++
@@ -185,10 +190,10 @@ export function aggregateCSV(rows, targetMonth) {
     wa.total++
     if (hasWeightDisc) {
       wa.disc++
-      // weightDiff > 0 → courier over-billed (invoice > charged) → Shipmozo overpaid
-      // weightDiff < 0 → courier under-billed (invoice < charged)
-      if (weightDiff > 0) { wa.overKg  += weightDiff;         wa.overN++ }
-      else                { wa.underKg += Math.abs(weightDiff); wa.underN++ }
+      // weightDiff is always positive (Courier Invoice Weight > Charged Weight guaranteed)
+      // This is always Shipmozo's loss: courier billed more kg than seller declared
+      wa.overKg += weightDiff
+      wa.overN++
     }
     if (hasZoneMismatch) wa.zoneMismatch++
   }
