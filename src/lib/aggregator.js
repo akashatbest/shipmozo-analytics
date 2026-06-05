@@ -55,6 +55,7 @@ export function aggregateCSV(rows, targetMonth) {
   const sellerZones = {}
   const sellerCouriers = {}
   const sellerPriceCards = {}
+  const sellerCourierMap = {}    // key = "userId|||courier" → per-seller-courier metrics
   const discrepancyDetails = []  // per-order discrepancy details
 
   for (const row of rows) {
@@ -136,6 +137,17 @@ export function aggregateCSV(rows, targetMonth) {
     if (usedZone)     sellerZones[userId][usedZone]        = (sellerZones[userId][usedZone]        || 0) + 1
     if (courier)      sellerCouriers[userId][courier]      = (sellerCouriers[userId][courier]      || 0) + 1
     if (priceCardId)  sellerPriceCards[userId][priceCardId] = (sellerPriceCards[userId][priceCardId] || 0) + 1
+
+    // ── Seller × Courier breakdown (for accurate per-courier metrics per seller) ──
+    if (courier) {
+      const scKey = `${userId}|||${courier}`
+      if (!sellerCourierMap[scKey]) {
+        sellerCourierMap[scKey] = { userId, courier, orders: 0, rev: 0, cost: 0, rto: 0, weight: 0 }
+      }
+      const sc = sellerCourierMap[scKey]
+      sc.orders++; sc.rev += revenue; sc.cost += cost; sc.weight += charged
+      if (isRto) sc.rto++
+    }
 
     // ── Price cards ───────────────────────────────────────────────────────
     if (priceCardId) {
@@ -381,6 +393,20 @@ export function aggregateCSV(rows, targetMonth) {
     priceCardMonthly,
     uniqueSellers,
     discrepancyDetails,
+    sellerCourierMonthly: Object.values(sellerCourierMap).map(sc => ({
+      month:               targetMonth,
+      user_id:             sc.userId,
+      courier:             sc.courier,
+      orders:              sc.orders,
+      revenue_billed:      r2(sc.rev),
+      courier_cost:        r2(sc.cost),
+      margin:              r2(sc.rev - sc.cost),
+      margin_pct:          rate(sc.rev - sc.cost, sc.rev),
+      rto_count:           sc.rto,
+      rto_rate:            rate(sc.rto, sc.orders),
+      avg_shipping_charge: r2(sc.rev / (sc.orders || 1)),
+      avg_weight:          r2(sc.weight / (sc.orders || 1)),
+    })),
   }
 }
 

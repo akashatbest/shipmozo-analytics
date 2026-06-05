@@ -8,6 +8,17 @@ import { exportCSV, ExportButton } from '../lib/exportCSV.jsx'
 
 const PAGE_SIZE = 100
 
+// Fetch per-seller per-courier breakdown on demand
+async function fetchSellerCourierBreakdown(userId, month) {
+  const { data } = await supabase
+    .from('seller_courier_monthly')
+    .select('courier,orders,revenue_billed,courier_cost,margin,margin_pct,rto_rate,avg_shipping_charge,avg_weight')
+    .eq('month', month)
+    .eq('user_id', userId)
+    .order('orders', { ascending: false })
+  return data ?? []
+}
+
 export default function SellerPnL() {
   const { selectedMonth: month } = useMonth()
   const navigate = useNavigate()
@@ -18,7 +29,10 @@ export default function SellerPnL() {
   const [sortKey, setSortKey]   = useState('revenue_billed')
   const [sortDir, setSortDir]   = useState('desc')
   const [page, setPage]         = useState(1)
-  const [marginFilter, setMarginFilter] = useState('all') // all | negative | thin | healthy | overpriced
+  const [marginFilter, setMarginFilter] = useState('all')
+  const [expanded, setExpanded]         = useState(null)   // user_id
+  const [courierBreakdown, setCourierBreakdown] = useState({}) // user_id → array
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false)
 
   useEffect(() => {
     if (!month) return
@@ -187,26 +201,43 @@ export default function SellerPnL() {
                 <SortTh col="avg_weight" right>Avg Weight</SortTh>
                 <SortTh col="disc_pct" right>Disc. %</SortTh>
                 <SortTh col="rto_rate" right>RTO %</SortTh>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-left" style={{ color:'var(--color-text-muted)' }}>Courier</th>
-                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-left" style={{ color:'var(--color-text-muted)' }}>Price Card</th>
+                <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-left" style={{ color:'var(--color-text-muted)' }}>
+                  Couriers
+                  <span className="ml-1 font-normal opacity-60" title="All couriers used by this seller. Click row to see per-courier breakdown.">ⓘ</span>
+                </th>
+                <th className="px-4 py-3 w-6"></th>
               </tr>
             </thead>
             <tbody>
               {paginated.map((s, idx) => {
-                const isLast = idx === paginated.length - 1
+                const isLast    = idx === paginated.length - 1
+                const isOpen    = expanded === s.user_id
                 const marginNeg  = s.margin_pct < 0
                 const marginThin = !marginNeg && s.margin_pct < 8
                 const rtoHigh    = s.rto_rate > 25
                 const discHigh   = s.disc_pct > 20
 
+                async function toggleBreakdown() {
+                  if (isOpen) { setExpanded(null); return }
+                  setExpanded(s.user_id)
+                  if (!courierBreakdown[s.user_id]) {
+                    setLoadingBreakdown(true)
+                    const data = await fetchSellerCourierBreakdown(s.user_id, month)
+                    setCourierBreakdown(prev => ({ ...prev, [s.user_id]: data }))
+                    setLoadingBreakdown(false)
+                  }
+                }
+
                 return (
+                  <>
                   <tr key={s.user_id}
-                    className="hover:bg-slate-50/60 transition-colors"
-                    style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border-2)' }}>
+                    className="hover:bg-slate-50/60 transition-colors cursor-pointer"
+                    onClick={toggleBreakdown}
+                    style={{ borderBottom: isOpen ? 'none' : isLast ? 'none' : '1px solid var(--color-border-2)' }}>
 
                     {/* Seller name */}
                     <td className="px-4 py-3">
-                      <button onClick={() => navigate(`/seller/${s.user_id}`)}
+                      <button onClick={e => { e.stopPropagation(); navigate(`/seller/${s.user_id}`) }}
                         className="font-semibold text-sm text-left hover:underline"
                         style={{ color:'var(--color-primary)' }}>
                         {s.name || `Seller ${s.user_id}`}
@@ -269,16 +300,110 @@ export default function SellerPnL() {
                       </span>
                     </td>
 
-                    {/* Courier */}
-                    <td className="px-4 py-3 text-xs" style={{ color:'var(--color-text-muted)' }}>
-                      {s.primary_courier || '—'}
+                    {/* Couriers (all, shown as dots) */}
+                    <td className="px-4 py-3">
+                      <span className="text-xs" style={{ color:'var(--color-text-muted)' }}>
+                        {s.primary_courier || '—'}
+                        {isOpen && <span className="ml-1 text-blue-400">(expand ↓)</span>}
+                      </span>
                     </td>
 
-                    {/* Price Card */}
-                    <td className="px-4 py-3 text-xs font-mono" style={{ color:'var(--color-text-muted)' }}>
-                      {s.price_card_id || '—'}
+                    {/* Expand arrow */}
+                    <td className="px-4 py-3">
+                      <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                        style={{ color:'var(--color-text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      </svg>
                     </td>
                   </tr>
+
+                  {/* ── Courier breakdown row ── */}
+                  {isOpen && (
+                    <tr key={`${s.user_id}-breakdown`}>
+                      <td colSpan={12} className="px-5 py-4"
+                        style={{ background:'var(--color-surface-2)', borderBottom: isLast ? 'none' : '1px solid var(--color-border-2)' }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-xs font-semibold" style={{ color:'#1e40af' }}>
+                            Per-courier breakdown for <strong>{s.name}</strong> — each row shows metrics for that courier only. Total row = sum of all couriers.
+                          </p>
+                        </div>
+
+                        {(loadingBreakdown && !courierBreakdown[s.user_id]) ? (
+                          <div className="flex items-center gap-2 py-2" style={{ color:'var(--color-text-muted)' }}>
+                            <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor:'var(--color-primary)', borderTopColor:'transparent' }} />
+                            <span className="text-sm">Loading…</span>
+                          </div>
+                        ) : (courierBreakdown[s.user_id]?.length === 0) ? (
+                          <p className="text-sm py-2" style={{ color:'var(--color-text-muted)' }}>
+                            No per-courier data — re-upload the CSV to populate this breakdown.
+                          </p>
+                        ) : (
+                          <div className="rounded-xl overflow-hidden"
+                            style={{ border:'1px solid var(--color-border)', background:'var(--color-surface)' }}>
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr style={{ background:'var(--color-surface-2)', borderBottom:'1px solid var(--color-border-2)' }}>
+                                  {['Courier','Orders','% of Total','Revenue','Courier Cost','Margin ₹','Margin %','Avg Charge','Avg Weight','RTO %'].map(h => (
+                                    <th key={h} className="px-3 py-2 text-left font-semibold uppercase tracking-wide whitespace-nowrap"
+                                      style={{ color:'var(--color-text-muted)' }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(courierBreakdown[s.user_id] ?? []).map((cb, ci) => {
+                                  const share = s.orders > 0 ? (cb.orders / s.orders * 100).toFixed(1) : 0
+                                  return (
+                                    <tr key={ci} className="hover:bg-slate-50 transition-colors"
+                                      style={{ borderBottom: ci < (courierBreakdown[s.user_id]?.length ?? 0)-1 ? '1px solid var(--color-border-2)' : 'none' }}>
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full" style={{ background: courierColor(cb.courier) }} />
+                                          <span className="font-semibold" style={{ color:'var(--color-text-primary)' }}>{cb.courier}</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2 font-medium" style={{ color:'var(--color-text-secondary)' }}>{fmtNum(cb.orders)}</td>
+                                      <td className="px-3 py-2">
+                                        <div className="flex items-center gap-1.5">
+                                          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background:'var(--color-border)' }}>
+                                            <div className="h-full rounded-full" style={{ width:`${share}%`, background: courierColor(cb.courier) }} />
+                                          </div>
+                                          <span style={{ color:'var(--color-text-muted)' }}>{share}%</span>
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2 font-medium" style={{ color:'var(--color-text-primary)' }}>{fmtINR(cb.revenue_billed)}</td>
+                                      <td className="px-3 py-2" style={{ color:'var(--color-text-secondary)' }}>{fmtINR(cb.courier_cost)}</td>
+                                      <td className={`px-3 py-2 font-semibold ${cb.margin < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmtINR(cb.margin)}</td>
+                                      <td className="px-3 py-2"><MarginBadge pct={cb.margin_pct} /></td>
+                                      <td className="px-3 py-2" style={{ color:'var(--color-text-secondary)' }}>₹{cb.avg_shipping_charge?.toFixed(0)}</td>
+                                      <td className="px-3 py-2" style={{ color:'var(--color-text-secondary)' }}>{cb.avg_weight > 0 ? `${cb.avg_weight.toFixed(2)} kg` : '—'}</td>
+                                      <td className={`px-3 py-2 font-semibold ${cb.rto_rate > 25 ? 'text-red-600' : 'text-slate-500'}`}>{fmtPct(cb.rto_rate)}</td>
+                                    </tr>
+                                  )
+                                })}
+                                {/* Total row */}
+                                <tr style={{ background:'var(--color-surface-2)', borderTop:'2px solid var(--color-border)' }}>
+                                  <td className="px-3 py-2 font-bold text-xs" style={{ color:'var(--color-text-primary)' }}>TOTAL</td>
+                                  <td className="px-3 py-2 font-bold text-xs" style={{ color:'var(--color-text-primary)' }}>{fmtNum(s.orders)}</td>
+                                  <td className="px-3 py-2 text-xs" style={{ color:'var(--color-text-muted)' }}>100%</td>
+                                  <td className="px-3 py-2 font-bold text-xs" style={{ color:'var(--color-text-primary)' }}>{fmtINR(s.revenue_billed)}</td>
+                                  <td className="px-3 py-2 font-bold text-xs" style={{ color:'var(--color-text-primary)' }}>{fmtINR(s.courier_cost)}</td>
+                                  <td className={`px-3 py-2 font-bold text-xs ${s.margin < 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmtINR(s.margin)}</td>
+                                  <td className="px-3 py-2"><MarginBadge pct={s.margin_pct} /></td>
+                                  <td className="px-3 py-2 font-bold text-xs" style={{ color:'var(--color-text-primary)' }}>₹{(s.avg_shipping_charge ?? 0).toFixed(0)}</td>
+                                  <td className="px-3 py-2 font-bold text-xs" style={{ color:'var(--color-text-primary)' }}>{s.avg_weight > 0 ? `${s.avg_weight.toFixed(2)} kg` : '—'}</td>
+                                  <td className={`px-3 py-2 font-bold text-xs ${s.rto_rate > 25 ? 'text-red-600' : 'text-slate-500'}`}>{fmtPct(s.rto_rate)}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 )
               })}
             </tbody>
