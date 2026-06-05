@@ -42,21 +42,28 @@ async function parseCSV(file, onProgress) {
 }
 
 async function deleteMonthData(month) {
-  const monthTables = [
+  // Core tables — must exist
+  const coreTables = [
     'monthly_overview', 'courier_monthly', 'seller_monthly', 'zone_monthly',
     'service_type_monthly', 'credit_notes_monthly', 'weight_audit_monthly', 'price_card_monthly',
-    'weight_discrepancy_details', 'seller_courier_monthly',
   ]
-  for (const table of monthTables) {
+  for (const table of coreTables) {
     const { error } = await supabase.from(table).delete().eq('month', month)
     if (error) throw new Error(`Delete ${table}: ${error.message}`)
   }
-  // daily_summary filtered by month column
+  // daily_summary
   const { error: dErr } = await supabase.from('daily_summary').delete().eq('month', month)
   if (dErr) throw new Error(`Delete daily_summary: ${dErr.message}`)
-  // ai_insights for this month
+  // Optional tables — skip silently if not yet created in Supabase
+  const optionalTables = ['weight_discrepancy_details', 'seller_courier_monthly']
+  for (const table of optionalTables) {
+    const { error } = await supabase.from(table).delete().eq('month', month)
+    if (error && !error.message.includes('schema cache') && !error.message.includes('does not exist')) {
+      throw new Error(`Delete ${table}: ${error.message}`)
+    }
+  }
+  // ai_insights + upload_log
   await supabase.from('ai_insights').delete().eq('month', month)
-  // upload_log for this month
   await supabase.from('upload_log').delete().eq('month', month)
 }
 
@@ -345,13 +352,23 @@ export default function UploadPage() {
       await batchUpsert('credit_notes_monthly',data.creditNotesMonthly,    { onConflict: 'month,reason' })
       await batchUpsert('weight_audit_monthly',data.weightAuditMonthly,    { onConflict: 'month,courier' })
       await batchUpsert('price_card_monthly',      data.priceCardMonthly,      { onConflict: 'month,price_card_id' })
-      await batchUpsert('seller_courier_monthly',  data.sellerCourierMonthly, { onConflict: 'month,user_id,courier' })
-      // Discrepancy details — insert in batches (no onConflict: each row is a unique order)
+      // Optional tables — silently skip if not yet created in Supabase
+      try {
+        await batchUpsert('seller_courier_monthly', data.sellerCourierMonthly, { onConflict: 'month,user_id,courier' })
+      } catch (e) {
+        if (!e.message.includes('schema cache') && !e.message.includes('does not exist')) throw e
+        console.warn('seller_courier_monthly table not found — run the SQL migration to enable per-courier breakdown')
+      }
       if (data.discrepancyDetails?.length) {
-        const DBATCH = 500
-        for (let i = 0; i < data.discrepancyDetails.length; i += DBATCH) {
-          const { error: de } = await supabase.from('weight_discrepancy_details').insert(data.discrepancyDetails.slice(i, i + DBATCH))
-          if (de) throw new Error(`Insert weight_discrepancy_details: ${de.message}`)
+        try {
+          const DBATCH = 500
+          for (let i = 0; i < data.discrepancyDetails.length; i += DBATCH) {
+            const { error: de } = await supabase.from('weight_discrepancy_details').insert(data.discrepancyDetails.slice(i, i + DBATCH))
+            if (de) throw new Error(de.message)
+          }
+        } catch (e) {
+          if (!e.message.includes('schema cache') && !e.message.includes('does not exist')) throw e
+          console.warn('weight_discrepancy_details table not found — run the SQL migration to enable order drill-down')
         }
       }
       setStep('upsert', 'done')
