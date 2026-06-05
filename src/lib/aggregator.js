@@ -73,16 +73,22 @@ export function aggregateCSV(rows, targetMonth) {
     const zone        = str(row['Zone'])
     const courierZone = str(row['Courier Zone'])
     const usedZone    = courierZone || zone
-    const isRto       = str(row['Rto']).toUpperCase() === 'YES'
-    const charged     = num(row['Charged Weight'])
-    const courierW    = num(row['Courier Weight'])
-    const cnReason    = str(row['Credit Note Reason'])
-    const cnAmount    = num(row['Credit Note Amount'])
-    const dateStr     = d ? toDateStr(d) : null
-    const dow         = d ? DAYS[d.getDay()] : null
+    const isRto          = str(row['Rto']).toUpperCase() === 'YES'
+    const chargedWeight  = num(row['Charged Weight'])          // weight Shipmozo agreed to bill seller
+    const invoiceWeight  = num(row['Courier Invoice Weight'])  // weight courier actually billed Shipmozo
+    const cnReason       = str(row['Credit Note Reason'])
+    const cnAmount       = num(row['Credit Note Amount'])
+    const dateStr        = d ? toDateStr(d) : null
+    const dow            = d ? DAYS[d.getDay()] : null
 
-    const hasWeightDisc  = charged > 0 && courierW > 0 && Math.abs(charged - courierW) > 0.1
+    // Discrepancy = courier invoiced a DIFFERENT weight than what was charged
+    // Formula: Courier Invoice Weight vs Charged Weight  (NOT Courier Weight column)
+    const hasWeightDisc   = invoiceWeight > 0 && chargedWeight > 0 && Math.abs(invoiceWeight - chargedWeight) > 0.1
+    const weightDiff      = invoiceWeight - chargedWeight  // positive = courier over-billed
     const hasZoneMismatch = zone && courierZone && zone !== courierZone
+
+    // Use invoiceWeight for weight-related aggregations (it's the billable weight per courier)
+    const charged = invoiceWeight || chargedWeight  // fallback to chargedWeight if invoice not available
 
     // ── Overview ──────────────────────────────────────────────────────────
     totalOrders++
@@ -179,9 +185,10 @@ export function aggregateCSV(rows, targetMonth) {
     wa.total++
     if (hasWeightDisc) {
       wa.disc++
-      const diff = charged - courierW
-      if (diff > 0) { wa.overKg  += diff;         wa.overN++ }
-      else          { wa.underKg += Math.abs(diff); wa.underN++ }
+      // weightDiff > 0 → courier over-billed (invoice > charged) → Shipmozo overpaid
+      // weightDiff < 0 → courier under-billed (invoice < charged)
+      if (weightDiff > 0) { wa.overKg  += weightDiff;         wa.overN++ }
+      else                { wa.underKg += Math.abs(weightDiff); wa.underN++ }
     }
     if (hasZoneMismatch) wa.zoneMismatch++
   }
