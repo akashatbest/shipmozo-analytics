@@ -9,6 +9,7 @@ import SellerHealth from './components/SellerHealth'
 import SellerIntelligence from './components/SellerIntelligence'
 import PriceCardAnalysis from './components/PriceCardAnalysis'
 import PricingEngine from './components/PricingEngine'
+import SellerPnL from './components/SellerPnL'
 import TeamAnalytics from './components/TeamAnalytics'
 import RTOAnalytics from './components/RTOAnalytics'
 import ZoneAnalysis from './components/ZoneAnalysis'
@@ -41,6 +42,7 @@ function AppContent() {
         <Route path="/" element={<Layout />}>
           <Route index element={<ExecutiveOverview />} />
           <Route path="courier-pnl" element={<CourierPnL />} />
+          <Route path="seller-pnl" element={<SellerPnL />} />
           <Route path="seller-health" element={<SellerHealth />} />
           <Route path="seller-intel" element={<SellerIntelligence />} />
           <Route path="price-cards" element={<PriceCardAnalysis />} />

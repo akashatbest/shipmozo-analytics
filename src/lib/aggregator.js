@@ -121,14 +121,14 @@ export function aggregateCSV(rows, targetMonth) {
         user_id: userId,
         name: str(row['Name']),
         company_name: str(row['Company Name']),
-        orders: 0, rev: 0, cost: 0, rto: 0, disc: 0, cnCount: 0, cnAmt: 0,
+        orders: 0, rev: 0, cost: 0, rto: 0, disc: 0, cnCount: 0, cnAmt: 0, weight: 0,
       }
       sellerZones[userId]      = {}
       sellerCouriers[userId]   = {}
       sellerPriceCards[userId] = {}
     }
     const sm = sellerMap[userId]
-    sm.orders++; sm.rev += revenue; sm.cost += cost
+    sm.orders++; sm.rev += revenue; sm.cost += cost; sm.weight += charged
     if (isRto)         sm.rto++
     if (hasWeightDisc) sm.disc++
     if (cnReason)      { sm.cnCount++; sm.cnAmt += cnAmount }
@@ -261,6 +261,7 @@ export function aggregateCSV(rows, targetMonth) {
       weight_discrepancy_count: s.disc,
       credit_note_count: s.cnCount,
       credit_note_amount: r2(s.cnAmt),
+      avg_weight: r2(s.weight / (s.orders || 1)),
       price_card_id: topKey(sellerPriceCards[s.user_id] || {}),
     }
   })
