@@ -113,7 +113,16 @@ export const doughnutOpts = (overrides = {}) => ({
 })
 
 // ── Format helpers ────────────────────────────────────────────────────────────
-export const fmtINR   = n => `₹${((n ?? 0) / 100000).toFixed(1)}L`
+// Smart currency formatter: shows ₹, ₹K, or ₹L based on magnitude
+// so small amounts like ₹2,580 don't show as the misleading "₹0.0L"
+export const fmtINR = n => {
+  const val = n ?? 0
+  const abs = Math.abs(val)
+  const sign = val < 0 ? '-' : ''
+  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(1)}L`
+  if (abs >= 1000)   return `${sign}₹${(abs / 1000).toFixed(1)}K`
+  return `${sign}₹${Math.round(abs).toLocaleString('en-IN')}`
+}
 export const fmtPct   = n => `${(n ?? 0).toFixed(1)}%`
 export const fmtNum   = n => (n ?? 0).toLocaleString('en-IN')
 export const fmtMonth = m => {
