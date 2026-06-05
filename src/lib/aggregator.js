@@ -235,7 +235,7 @@ export function aggregateCSV(rows, targetMonth) {
       revenue_billed: r2(s.rev),
       courier_cost: r2(s.cost),
       margin: r2(s.rev - s.cost),
-      margin_pct: rate(s.rev - s.cost, s.rev),
+      // margin_pct is not a column in seller_monthly — computed client-side
       rto_count: s.rto,
       rto_rate: rate(s.rto, s.orders),
       avg_shipping_charge: r2(s.rev / (s.orders || 1)),
