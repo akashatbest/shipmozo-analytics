@@ -11,6 +11,8 @@ import PriceCardAnalysis from './components/PriceCardAnalysis'
 import PricingEngine from './components/PricingEngine'
 import SellerPnL from './components/SellerPnL'
 import TeamAnalytics from './components/TeamAnalytics'
+import BranchManagement from './components/BranchManagement'
+import BranchReport from './components/BranchReport'
 import RTOAnalytics from './components/RTOAnalytics'
 import ZoneAnalysis from './components/ZoneAnalysis'
 import BillingAudit from './components/BillingAudit'
@@ -52,6 +54,8 @@ function AppContent() {
           <Route path="billing" element={<BillingAudit />} />
           <Route path="ask" element={<AskAnything />} />
           <Route path="team" element={<TeamAnalytics />} />
+          <Route path="branch-report" element={<BranchReport />} />
+          <Route path="branch-management" element={<BranchManagement />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="seller/:userId" element={<SellerProfile />} />
         </Route>
