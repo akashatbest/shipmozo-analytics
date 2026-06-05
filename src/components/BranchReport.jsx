@@ -6,115 +6,135 @@ import { PageHeader, Spinner, EmptyState, MarginBadge } from './ui'
 import { exportCSV, ExportButton } from '../lib/exportCSV.jsx'
 import { useNavigate } from 'react-router-dom'
 
+// Turn raw sums (from RPC or fallback) into the display row with derived ratios
+function deriveBranchStats(r) {
+  const revenue = r.revenue ?? 0
+  const orders  = r.orders ?? 0
+  return {
+    id:           r.branch_id,
+    name:         r.branch_name,
+    city:         r.city,
+    spoc_count:   r.spoc_count ?? 0,
+    seller_count: r.seller_count ?? 0,
+    orders,
+    revenue,
+    margin:       r.margin ?? 0,
+    margin_pct:   revenue > 0 ? (r.margin / revenue * 100) : 0,
+    avg_charge:   orders > 0 ? (r.total_charge / orders) : 0,
+    avg_weight:   (r.weight_orders ?? 0) > 0 ? (r.total_weight / r.weight_orders) : 0,
+    disc_pct:     orders > 0 ? (r.disc_orders / orders * 100) : 0,
+    rto_rate:     orders > 0 ? (r.rto_orders / orders * 100) : 0,
+  }
+}
+
 export default function BranchReport() {
   const { selectedMonth: month } = useMonth()
   const navigate = useNavigate()
 
-  const [branches, setBranches]   = useState([])
-  const [spocMap, setSpocMap]     = useState({})   // spoc_name → branch_id
-  const [sellerTeam, setSellerTeam] = useState([]) // user_id → spoc_name
-  const [sellerData, setSellerData] = useState([]) // seller_monthly rows
-  const [loading, setLoading]     = useState(true)
-  const [expanded, setExpanded]   = useState(null) // branch_id
-  const [sortKey, setSortKey]     = useState('revenue')
-  const [sortDir, setSortDir]     = useState('desc')
+  const [branches, setBranches]     = useState([])
+  const [rawStats, setRawStats]     = useState([])   // pre-aggregated branch rows
+  const [unmapped, setUnmapped]     = useState(0)
+  const [loading, setLoading]       = useState(true)
+  const [expanded, setExpanded]     = useState(null) // branch_id
+  const [branchSellers, setBranchSellers] = useState({}) // branchId → sellers[]
+  const [loadingSellers, setLoadingSellers] = useState(false)
+  const [sortKey, setSortKey]       = useState('revenue')
+  const [sortDir, setSortDir]       = useState('desc')
 
   useEffect(() => {
+    if (!month) return
     async function load() {
       setLoading(true)
-      const [{ data: br }, { data: sbm }, team, sm] = await Promise.all([
-        supabase.from('branches').select('*').order('name'),
+      setExpanded(null); setBranchSellers({})
+
+      const { data: br } = await supabase.from('branches').select('*').order('name')
+      setBranches(br ?? [])
+      if (!br?.length) { setLoading(false); return }
+
+      // ── Fast path: database-side aggregation via RPC ──
+      const { data: rpc, error } = await supabase.rpc('get_branch_report', { p_month: month })
+
+      if (!error && rpc) {
+        setRawStats(rpc.map(r => deriveBranchStats(r)))
+        // unmapped count (cheap RPC; fall back to 0 if not present)
+        const { data: um } = await supabase.rpc('get_unmapped_seller_count', { p_month: month })
+        setUnmapped(typeof um === 'number' ? um : 0)
+        setLoading(false)
+        return
+      }
+
+      // ── Fallback: client-side aggregation (used if RPC not installed) ──
+      const [{ data: sbm }, team, sm] = await Promise.all([
         supabase.from('spoc_branch_map').select('spoc_name,branch_id'),
         fetchAllPaged(() => supabase.from('seller_team').select('user_id,spoc')),
         fetchAllPaged(() =>
           supabase.from('seller_monthly')
-            .select('user_id,name,company_name,orders,revenue_billed,courier_cost,margin,rto_count,rto_rate,avg_shipping_charge,avg_weight,weight_discrepancy_count')
+            .select('user_id,orders,revenue_billed,courier_cost,margin,rto_count,avg_shipping_charge,avg_weight,weight_discrepancy_count')
             .eq('month', month)
         ),
       ])
-      setBranches(br ?? [])
-      const sMap = Object.fromEntries((sbm ?? []).map(r => [r.spoc_name, r.branch_id]))
-      setSpocMap(sMap)
-      setSellerTeam(team)
-      setSellerData(sm)
+      const spocMap     = Object.fromEntries((sbm ?? []).map(r => [r.spoc_name, r.branch_id]))
+      const sellerToSpoc = Object.fromEntries(team.map(t => [t.user_id, t.spoc]))  // build ONCE (was the O(n²) bug)
+
+      const acc = {}
+      let unmappedCount = 0
+      for (const s of sm) {
+        const branchId = spocMap[sellerToSpoc[s.user_id]]
+        if (!branchId) { unmappedCount++; continue }
+        if (!acc[branchId]) acc[branchId] = { branch_id: branchId, spocs: new Set(), sellers: 0, orders: 0, revenue: 0, courier_cost: 0, margin: 0, total_charge: 0, total_weight: 0, weight_orders: 0, disc_orders: 0, rto_orders: 0 }
+        const a = acc[branchId]
+        a.spocs.add(sellerToSpoc[s.user_id]); a.sellers++
+        a.orders += s.orders ?? 0; a.revenue += s.revenue_billed ?? 0
+        a.courier_cost += s.courier_cost ?? 0; a.margin += s.margin ?? 0
+        a.total_charge += (s.avg_shipping_charge ?? 0) * (s.orders ?? 0)
+        if (s.avg_weight > 0) { a.total_weight += s.avg_weight * (s.orders ?? 0); a.weight_orders += s.orders ?? 0 }
+        a.disc_orders += s.weight_discrepancy_count ?? 0
+        a.rto_orders += s.rto_count ?? 0
+      }
+      setRawStats((br ?? []).map(b => {
+        const a = acc[b.id]
+        return deriveBranchStats({
+          branch_id: b.id, branch_name: b.name, city: b.city,
+          spoc_count: a ? a.spocs.size : 0, seller_count: a ? a.sellers : 0,
+          orders: a?.orders ?? 0, revenue: a?.revenue ?? 0, courier_cost: a?.courier_cost ?? 0,
+          margin: a?.margin ?? 0, total_charge: a?.total_charge ?? 0,
+          total_weight: a?.total_weight ?? 0, weight_orders: a?.weight_orders ?? 0,
+          disc_orders: a?.disc_orders ?? 0, rto_orders: a?.rto_orders ?? 0,
+        })
+      }))
+      setUnmapped(unmappedCount)
       setLoading(false)
     }
-    if (month) load()
+    load()
   }, [month])
 
-  // ── Build branch-level aggregates ──────────────────────────────────────────
-
+  // Sort the small pre-aggregated set (≈ number of branches — trivial)
   const branchStats = useMemo(() => {
-    if (!branches.length) return []
+    return [...rawStats].sort((a, b) => {
+      const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0
+      if (sortKey === 'name') return sortDir === 'desc' ? String(bv).localeCompare(String(av)) : String(av).localeCompare(String(bv))
+      return sortDir === 'desc' ? bv - av : av - bv
+    })
+  }, [rawStats, sortKey, sortDir])
 
-    // seller_id → spoc_name
-    const sellerToSpoc = Object.fromEntries(sellerTeam.map(t => [t.user_id, t.spoc]))
+  const totalRevenue = rawStats.reduce((a, b) => a + b.revenue, 0)
+  const totalMargin  = rawStats.reduce((a, b) => a + b.margin, 0)
+  const totalOrders  = rawStats.reduce((a, b) => a + b.orders, 0)
 
-    // spoc_name → branch_id
-    // branchId → accumulator
-    const acc = {}
-    const branchSellers = {}  // branchId → seller details array
-
-    for (const s of sellerData) {
-      const spoc     = sellerToSpoc[s.user_id]
-      const branchId = spocMap[spoc]
-      if (!branchId) continue
-
-      if (!acc[branchId]) {
-        acc[branchId] = {
-          spocs: new Set(), sellers: new Set(),
-          orders: 0, revenue: 0, margin: 0,
-          totalCharge: 0, totalWeight: 0, weightOrders: 0,
-          discOrders: 0, rtoOrders: 0,
-        }
-        branchSellers[branchId] = []
-      }
-      const a = acc[branchId]
-      a.spocs.add(spoc)
-      a.sellers.add(s.user_id)
-      a.orders   += s.orders ?? 0
-      a.revenue  += s.revenue_billed ?? 0
-      a.margin   += s.margin ?? 0
-      a.totalCharge  += (s.avg_shipping_charge ?? 0) * (s.orders ?? 0)
-      if (s.avg_weight > 0) { a.totalWeight += (s.avg_weight ?? 0) * (s.orders ?? 0); a.weightOrders += s.orders ?? 0 }
-      a.discOrders   += s.weight_discrepancy_count ?? 0
-      a.rtoOrders    += s.rto_count ?? 0
-      branchSellers[branchId].push({ ...s, spoc_name: spoc })
+  // Load a branch's top sellers on demand (only when expanded)
+  async function toggleExpand(branchId) {
+    if (expanded === branchId) { setExpanded(null); return }
+    setExpanded(branchId)
+    if (branchSellers[branchId]) return
+    setLoadingSellers(true)
+    let sellers = []
+    const { data: rpc, error } = await supabase.rpc('get_branch_sellers', { p_month: month, p_branch_id: branchId })
+    if (!error && rpc) {
+      sellers = rpc.map(s => ({ ...s, revenue_billed: s.revenue_billed, spoc_name: s.spoc }))
     }
-
-    return branches
-      .map(b => {
-        const a = acc[b.id]
-        if (!a) return { ...b, orders: 0, revenue: 0, margin: 0, margin_pct: 0, avg_charge: 0, avg_weight: 0, disc_pct: 0, rto_rate: 0, spoc_count: 0, seller_count: 0, sellers: [] }
-        const margin_pct = a.revenue > 0 ? (a.margin / a.revenue * 100) : 0
-        return {
-          ...b,
-          spoc_count:  a.spocs.size,
-          seller_count: a.sellers.size,
-          orders:      a.orders,
-          revenue:     a.revenue,
-          margin:      a.margin,
-          margin_pct,
-          avg_charge:  a.orders > 0 ? a.totalCharge / a.orders : 0,
-          avg_weight:  a.weightOrders > 0 ? a.totalWeight / a.weightOrders : 0,
-          disc_pct:    a.orders > 0 ? (a.discOrders / a.orders * 100) : 0,
-          rto_rate:    a.orders > 0 ? (a.rtoOrders / a.orders * 100) : 0,
-          sellers:     (branchSellers[b.id] ?? []).sort((x, y) => y.revenue_billed - x.revenue_billed),
-        }
-      })
-      .sort((a, b) => {
-        const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0
-        return sortDir === 'desc' ? bv - av : av - bv
-      })
-  }, [branches, spocMap, sellerTeam, sellerData, sortKey, sortDir])
-
-  const totalRevenue = branchStats.reduce((a, b) => a + b.revenue, 0)
-  const totalMargin  = branchStats.reduce((a, b) => a + b.margin, 0)
-  const totalOrders  = branchStats.reduce((a, b) => a + b.orders, 0)
-  const unmapped     = sellerData.filter(s => {
-    const spoc = Object.fromEntries(sellerTeam.map(t => [t.user_id, t.spoc]))[s.user_id]
-    return !spocMap[spoc]
-  }).length
+    setBranchSellers(prev => ({ ...prev, [branchId]: sellers }))
+    setLoadingSellers(false)
+  }
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
@@ -234,7 +254,7 @@ export default function BranchReport() {
                 return (
                   <>
                     <tr key={b.id}
-                      onClick={() => setExpanded(isOpen ? null : b.id)}
+                      onClick={() => toggleExpand(b.id)}
                       className="cursor-pointer hover:bg-blue-50/30 transition-colors"
                       style={{ borderBottom: isOpen ? 'none' : isLast ? 'none' : '1px solid var(--color-border-2)' }}>
 
@@ -303,6 +323,16 @@ export default function BranchReport() {
                           <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color:'var(--color-text-muted)' }}>
                             {b.name} — Top Sellers
                           </p>
+                          {loadingSellers && !branchSellers[b.id] ? (
+                            <div className="flex items-center gap-2 py-3" style={{ color:'var(--color-text-muted)' }}>
+                              <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor:'var(--color-primary)', borderTopColor:'transparent' }} />
+                              <span className="text-sm">Loading sellers…</span>
+                            </div>
+                          ) : (branchSellers[b.id]?.length === 0) ? (
+                            <p className="text-sm py-3" style={{ color:'var(--color-text-muted)' }}>
+                              No seller data. Run the SQL migration (get_branch_sellers) to enable this drill-down.
+                            </p>
+                          ) : (
                           <div className="rounded-xl overflow-hidden"
                             style={{ border:'1px solid var(--color-border)', background:'var(--color-surface)' }}>
                             <div className="overflow-x-auto" style={{ maxHeight: 320 }}>
@@ -316,12 +346,12 @@ export default function BranchReport() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {b.sellers.slice(0, 25).map((s, i) => {
+                                  {(branchSellers[b.id] ?? []).map((s, i, arr) => {
                                     const mp = s.revenue_billed > 0 ? (s.margin / s.revenue_billed * 100) : 0
                                     return (
                                       <tr key={s.user_id} className="hover:bg-slate-50 transition-colors cursor-pointer"
                                         onClick={() => navigate(`/seller/${s.user_id}`)}
-                                        style={{ borderBottom: i < Math.min(b.sellers.length, 25)-1 ? '1px solid var(--color-border-2)' : 'none' }}>
+                                        style={{ borderBottom: i < arr.length-1 ? '1px solid var(--color-border-2)' : 'none' }}>
                                         <td className="px-3 py-2">
                                           <p className="font-medium" style={{ color:'var(--color-primary)' }}>{s.name || `Seller ${s.user_id}`}</p>
                                           <p className="opacity-60">{s.company_name}</p>
@@ -338,15 +368,11 @@ export default function BranchReport() {
                                       </tr>
                                     )
                                   })}
-                                  {b.sellers.length > 25 && (
-                                    <tr><td colSpan={6} className="px-3 py-2 text-center" style={{ color:'var(--color-text-muted)' }}>
-                                      +{b.sellers.length - 25} more sellers in this branch
-                                    </td></tr>
-                                  )}
                                 </tbody>
                               </table>
                             </div>
                           </div>
+                          )}
                         </td>
                       </tr>
                     )}
