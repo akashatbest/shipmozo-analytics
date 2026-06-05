@@ -45,6 +45,7 @@ async function deleteMonthData(month) {
   const monthTables = [
     'monthly_overview', 'courier_monthly', 'seller_monthly', 'zone_monthly',
     'service_type_monthly', 'credit_notes_monthly', 'weight_audit_monthly', 'price_card_monthly',
+    'weight_discrepancy_details',
   ]
   for (const table of monthTables) {
     const { error } = await supabase.from(table).delete().eq('month', month)
@@ -344,6 +345,14 @@ export default function UploadPage() {
       await batchUpsert('credit_notes_monthly',data.creditNotesMonthly,    { onConflict: 'month,reason' })
       await batchUpsert('weight_audit_monthly',data.weightAuditMonthly,    { onConflict: 'month,courier' })
       await batchUpsert('price_card_monthly',  data.priceCardMonthly,      { onConflict: 'month,price_card_id' })
+      // Discrepancy details — insert in batches (no onConflict: each row is a unique order)
+      if (data.discrepancyDetails?.length) {
+        const DBATCH = 500
+        for (let i = 0; i < data.discrepancyDetails.length; i += DBATCH) {
+          const { error: de } = await supabase.from('weight_discrepancy_details').insert(data.discrepancyDetails.slice(i, i + DBATCH))
+          if (de) throw new Error(`Insert weight_discrepancy_details: ${de.message}`)
+        }
+      }
       setStep('upsert', 'done')
 
       // Health scores

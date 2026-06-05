@@ -55,6 +55,7 @@ export function aggregateCSV(rows, targetMonth) {
   const sellerZones = {}
   const sellerCouriers = {}
   const sellerPriceCards = {}
+  const discrepancyDetails = []  // per-order discrepancy details
 
   for (const row of rows) {
     // Parse date — skip only if completely unparseable (blank cell etc.)
@@ -194,6 +195,24 @@ export function aggregateCSV(rows, targetMonth) {
       // This is always Shipmozo's loss: courier billed more kg than seller declared
       wa.overKg += weightDiff
       wa.overN++
+
+      // Store individual order detail for drill-down
+      discrepancyDetails.push({
+        month:                 targetMonth,
+        user_id:               userId,
+        seller_name:           str(row['Name']),
+        company_name:          str(row['Company Name']),
+        order_id:              str(row['Order Id']),
+        awb_number:            str(row['AWB Number']),
+        courier,
+        service_type:          str(row['Courier Company Service Type']),
+        order_date:            dateStr,
+        zone,
+        courier_zone:          courierZone,
+        charged_weight:        chargedWeight,
+        courier_invoice_weight: invoiceWeight,
+        weight_diff:           r2(weightDiff),
+      })
     }
     if (hasZoneMismatch) wa.zoneMismatch++
   }
@@ -361,6 +380,7 @@ export function aggregateCSV(rows, targetMonth) {
     weightAuditMonthly,
     priceCardMonthly,
     uniqueSellers,
+    discrepancyDetails,
   }
 }
 
