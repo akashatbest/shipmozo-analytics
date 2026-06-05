@@ -252,9 +252,39 @@ export default function BillingAudit() {
             </div>
           </TableCard>
 
-          {/* Top sellers */}
+          {/* Top sellers — fast aggregated view */}
           {topDiscSellers.length > 0 && (
-            <SellerDiscrepancyTable sellers={topDiscSellers} month={month} weightCalc={weightCalc} />
+            <TableCard title="Top Sellers by Discrepancy Count" subtitle="Focus dispute efforts here — highest order volume with discrepancies">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <Thead>
+                    <Th>Seller</Th><Th right>Orders</Th><Th right>Discrepancies</Th>
+                    <Th right>Disc. Rate</Th><Th right>Revenue</Th>
+                  </Thead>
+                  <tbody className="divide-y" style={{ borderColor:'var(--color-border-2)' }}>
+                    {topDiscSellers.map(s => {
+                      const rate = s.orders > 0 ? (s.weight_discrepancy_count / s.orders * 100) : 0
+                      return (
+                        <tr key={s.user_id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-sm" style={{ color:'var(--color-text-primary)' }}>{s.name || `Seller ${s.user_id}`}</p>
+                            <p className="text-xs mt-0.5" style={{ color:'var(--color-text-muted)' }}>{s.company_name}</p>
+                          </td>
+                          <Td right>{fmtNum(s.orders)}</Td>
+                          <td className="px-4 py-3 text-right text-sm font-semibold text-amber-600">{fmtNum(s.weight_discrepancy_count)}</td>
+                          <td className="px-4 py-3 text-right">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${rate > 20 ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                              {rate.toFixed(1)}%
+                            </span>
+                          </td>
+                          <Td right>{fmtINR(s.revenue_billed)}</Td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </TableCard>
           )}
         </div>
       )}
@@ -476,197 +506,6 @@ export default function BillingAudit() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ── Seller Discrepancy Drill-Down Table ───────────────────────────────────────
-
-function SellerDiscrepancyTable({ sellers, month, weightCalc }) {
-  const [expanded, setExpanded]   = useState(null)  // user_id
-  const [orders, setOrders]       = useState([])
-  const [loadingOrders, setLoading] = useState(false)
-  const [orderSearch, setOrderSearch] = useState('')
-
-  async function loadOrders(userId) {
-    if (expanded === userId) { setExpanded(null); return }
-    setExpanded(userId)
-    setOrders([])
-    setLoading(true)
-    const { data } = await supabase
-      .from('weight_discrepancy_details')
-      .select('order_id,awb_number,courier,service_type,order_date,zone,courier_zone,charged_weight,courier_invoice_weight,weight_diff')
-      .eq('month', month)
-      .eq('user_id', userId)
-      .order('weight_diff', { ascending: false })
-      .limit(500)
-    setOrders(data ?? [])
-    setLoadingOrders(false)
-  }
-
-  const rateMap = Object.fromEntries((weightCalc ?? []).map(w => [w.courier, w.ratePerKg ?? 0]))
-
-  return (
-    <div className="rounded-xl overflow-hidden"
-      style={{ background:'var(--color-surface)', border:'1px solid var(--color-border)', boxShadow:'var(--shadow-sm)' }}>
-      <div className="px-5 py-4" style={{ borderBottom:'1px solid var(--color-border-2)' }}>
-        <h3 className="text-sm font-semibold" style={{ color:'var(--color-text-secondary)' }}>
-          Top Sellers by Discrepancy Count
-        </h3>
-        <p className="text-xs mt-0.5" style={{ color:'var(--color-text-muted)' }}>
-          Click a seller to see their individual discrepant orders
-        </p>
-      </div>
-      <table className="w-full text-sm">
-        <thead>
-          <tr style={{ background:'var(--color-surface-2)', borderBottom:'1px solid var(--color-border-2)' }}>
-            <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>Seller</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>Orders</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>Discrepancies</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>Disc. Rate</th>
-            <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>Revenue</th>
-            <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {sellers.map((s, idx) => {
-            const rate    = s.orders > 0 ? (s.weight_discrepancy_count / s.orders * 100) : 0
-            const isOpen  = expanded === s.user_id
-            const isLast  = idx === sellers.length - 1
-            const filtered = orders.filter(o =>
-              !orderSearch || o.order_id?.includes(orderSearch) || o.awb_number?.includes(orderSearch)
-            )
-
-            return (
-              <>
-                <tr key={s.user_id}
-                  onClick={() => loadOrders(s.user_id)}
-                  className="cursor-pointer hover:bg-blue-50/40 transition-colors"
-                  style={{ borderBottom: isOpen ? 'none' : isLast ? 'none' : '1px solid var(--color-border-2)' }}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm" style={{ color:'var(--color-text-primary)' }}>{s.name || `Seller ${s.user_id}`}</p>
-                    </div>
-                    <p className="text-xs mt-0.5" style={{ color:'var(--color-text-muted)' }}>{s.company_name}</p>
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm" style={{ color:'var(--color-text-secondary)' }}>{fmtNum(s.orders)}</td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold text-amber-600">{fmtNum(s.weight_discrepancy_count)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${rate > 20 ? 'bg-red-50 text-red-700 border-red-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                      {rate.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right text-sm" style={{ color:'var(--color-text-secondary)' }}>{fmtINR(s.revenue_billed)}</td>
-                  <td className="px-4 py-3">
-                    <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                      style={{ color:'var(--color-text-muted)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                    </svg>
-                  </td>
-                </tr>
-
-                {/* Order-level drill-down */}
-                {isOpen && (
-                  <tr key={`${s.user_id}-detail`}>
-                    <td colSpan={6} className="px-4 py-4"
-                      style={{ background:'var(--color-surface-2)', borderBottom: isLast ? 'none' : '1px solid var(--color-border-2)' }}>
-
-                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color:'var(--color-text-muted)' }}>
-                          {s.name} — discrepant orders
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <input value={orderSearch} onChange={e => setOrderSearch(e.target.value)}
-                            placeholder="Filter by Order ID or AWB…"
-                            className="text-xs rounded-lg px-3 py-1.5 focus:outline-none w-48"
-                            style={{ background:'var(--color-surface)', border:'1px solid var(--color-border)', color:'var(--color-text-primary)' }} />
-                          {orders.length > 0 && (
-                            <button onClick={() => {
-                              const hdrs = 'Order ID,AWB,Courier,Service,Date,Zone,Courier Zone,Charged kg,Invoice kg,Diff kg'
-                              const body = filtered.map(o => [o.order_id,o.awb_number,o.courier,o.service_type,o.order_date,o.zone,o.courier_zone,o.charged_weight,o.courier_invoice_weight,o.weight_diff].join(',')).join('\n')
-                              const blob = new Blob([hdrs + '\n' + body], { type:'text/csv' })
-                              const url = URL.createObjectURL(blob)
-                              const a = document.createElement('a'); a.href = url
-                              a.download = `disc-${s.user_id}-${month}.csv`; a.click()
-                              URL.revokeObjectURL(url)
-                            }} className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors hover:bg-slate-100"
-                              style={{ border:'1px solid var(--color-border)', color:'var(--color-text-secondary)' }}>
-                              ↓ Export
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {loadingOrders && (
-                        <div className="flex items-center gap-2 py-4" style={{ color:'var(--color-text-muted)' }}>
-                          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor:'var(--color-primary)', borderTopColor:'transparent' }} />
-                          <span className="text-sm">Loading orders…</span>
-                        </div>
-                      )}
-
-                      {!loadingOrders && orders.length === 0 && (
-                        <p className="text-sm text-center py-4" style={{ color:'var(--color-text-muted)' }}>
-                          No order-level data found. Re-upload the CSV to populate discrepancy details.
-                        </p>
-                      )}
-
-                      {!loadingOrders && orders.length > 0 && (
-                        <div className="rounded-xl overflow-hidden"
-                          style={{ border:'1px solid var(--color-border)', background:'var(--color-surface)' }}>
-                          <div className="overflow-x-auto" style={{ maxHeight: 380 }}>
-                            <table className="w-full text-xs">
-                              <thead className="sticky top-0" style={{ background:'var(--color-surface-2)', zIndex:1 }}>
-                                <tr style={{ borderBottom:'1px solid var(--color-border-2)' }}>
-                                  {['Order ID','AWB','Courier','Service','Date','Zone','Courier Zone','Charged (kg)','Invoice (kg)','Diff (kg)','Est. Loss'].map(h => (
-                                    <th key={h} className="px-3 py-2 text-left font-semibold uppercase tracking-wide whitespace-nowrap"
-                                      style={{ color:'var(--color-text-muted)' }}>{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {filtered.map((o, i) => {
-                                  const rate = rateMap[o.courier] ?? 0
-                                  const estLoss = o.weight_diff * rate
-                                  return (
-                                    <tr key={i} className="hover:bg-slate-50 transition-colors"
-                                      style={{ borderBottom: i < filtered.length-1 ? '1px solid var(--color-border-2)' : 'none' }}>
-                                      <td className="px-3 py-2 font-mono" style={{ color:'var(--color-text-secondary)' }}>{o.order_id || '—'}</td>
-                                      <td className="px-3 py-2 font-mono" style={{ color:'var(--color-text-muted)' }}>{o.awb_number || '—'}</td>
-                                      <td className="px-3 py-2" style={{ color:'var(--color-text-secondary)' }}>{o.courier}</td>
-                                      <td className="px-3 py-2 max-w-[120px] truncate" style={{ color:'var(--color-text-muted)' }} title={o.service_type}>{o.service_type}</td>
-                                      <td className="px-3 py-2 whitespace-nowrap" style={{ color:'var(--color-text-muted)' }}>{o.order_date || '—'}</td>
-                                      <td className="px-3 py-2" style={{ color:'var(--color-text-secondary)' }}>{o.zone || '—'}</td>
-                                      <td className="px-3 py-2" style={{ color: o.courier_zone !== o.zone ? '#d97706' : 'var(--color-text-secondary)' }}>
-                                        {o.courier_zone || '—'}
-                                        {o.courier_zone && o.zone && o.courier_zone !== o.zone && <span className="ml-1 text-amber-500">⚠</span>}
-                                      </td>
-                                      <td className="px-3 py-2 text-right" style={{ color:'var(--color-text-secondary)' }}>{o.charged_weight?.toFixed(3)}</td>
-                                      <td className="px-3 py-2 text-right font-semibold" style={{ color:'var(--color-text-primary)' }}>{o.courier_invoice_weight?.toFixed(3)}</td>
-                                      <td className="px-3 py-2 text-right font-bold text-red-600">+{o.weight_diff?.toFixed(3)}</td>
-                                      <td className="px-3 py-2 text-right font-semibold text-red-500">
-                                        {estLoss > 0 ? `₹${estLoss.toFixed(1)}` : '—'}
-                                      </td>
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                          {orders.length === 500 && (
-                            <p className="text-center text-xs py-2" style={{ color:'var(--color-text-muted)', borderTop:'1px solid var(--color-border-2)' }}>
-                              Showing top 500 by weight difference · Export for full list
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </>
-            )
-          })}
-        </tbody>
-      </table>
     </div>
   )
 }
