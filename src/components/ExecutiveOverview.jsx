@@ -18,7 +18,7 @@ const ACCENT = {
 }
 
 export default function ExecutiveOverview() {
-  const { selectedMonth } = useMonth()
+  const { selectedMonth, compareMonth } = useMonth()
   const [months, setMonths]     = useState([])
   const [couriers, setCouriers] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -28,7 +28,7 @@ export default function ExecutiveOverview() {
     async function load() {
       setLoading(true)
       const { data: ov } = await supabase
-        .from('monthly_overview').select('*').order('month', { ascending: false }).limit(6)
+        .from('monthly_overview').select('*').order('month', { ascending: false }).limit(12)
       const { data: cd } = await supabase
         .from('courier_monthly').select('courier,orders,revenue_billed,margin,margin_pct,rto_rate')
         .eq('month', selectedMonth).order('orders', { ascending: false })
@@ -41,57 +41,97 @@ export default function ExecutiveOverview() {
 
   if (loading || !months.length) return <EmptyState />
 
-  // Find the overview row for the selected month (may not be months[0] if user picked older month)
-  const cur  = months.find(m => m.month === selectedMonth) ?? months[0]
-  const all  = [...months].reverse()
-  const prev = months[months.findIndex(m => m.month === cur.month) + 1]
+  const cur   = months.find(m => m.month === selectedMonth) ?? months[0]
+  const cmp   = compareMonth ? months.find(m => m.month === compareMonth) : null
+  // Default "vs" = previous consecutive month (for MoM delta arrows)
+  const prev  = months[months.findIndex(m => m.month === cur.month) + 1]
+  const all   = [...months].reverse()
   const labels = all.map(m => fmtMonth(m.month))
 
+  // When comparing, deltas are vs the compare month, not the previous month
+  const baseline = cmp ?? prev
+
   const kpis = [
-    { label: 'Total Orders',   value: fmtNum(cur.total_orders),         d: momDelta(cur.total_orders, prev?.total_orders),                 accent: 'blue' },
-    { label: 'Revenue Billed', value: fmtINR(cur.total_revenue_billed), d: momDelta(cur.total_revenue_billed, prev?.total_revenue_billed), accent: 'blue' },
-    { label: 'Gross Margin',   value: fmtINR(cur.gross_margin),         d: momDelta(cur.gross_margin, prev?.gross_margin),                 accent: cur.gross_margin < 0 ? 'red' : 'green' },
-    { label: 'Margin %',       value: fmtPct(cur.margin_pct),           d: momDelta(cur.margin_pct, prev?.margin_pct),                    accent: cur.margin_pct < 5 ? 'red' : cur.margin_pct < 10 ? 'amber' : 'green' },
-    { label: 'RTO Rate',       value: fmtPct(cur.rto_rate),             d: momDelta(cur.rto_rate, prev?.rto_rate), lowerIsBetter: true,   accent: cur.rto_rate > 25 ? 'red' : cur.rto_rate > 15 ? 'amber' : 'green' },
-    { label: 'Active Sellers', value: fmtNum(cur.active_sellers),       d: momDelta(cur.active_sellers, prev?.active_sellers),             accent: 'blue' },
+    { label: 'Total Orders',   value: fmtNum(cur.total_orders),         d: momDelta(cur.total_orders, baseline?.total_orders),                 cmpVal: cmp ? fmtNum(cmp.total_orders) : null,         accent: 'blue' },
+    { label: 'Revenue Billed', value: fmtINR(cur.total_revenue_billed), d: momDelta(cur.total_revenue_billed, baseline?.total_revenue_billed), cmpVal: cmp ? fmtINR(cmp.total_revenue_billed) : null, accent: 'blue' },
+    { label: 'Gross Margin',   value: fmtINR(cur.gross_margin),         d: momDelta(cur.gross_margin, baseline?.gross_margin),                 cmpVal: cmp ? fmtINR(cmp.gross_margin) : null,         accent: cur.gross_margin < 0 ? 'red' : 'green' },
+    { label: 'Margin %',       value: fmtPct(cur.margin_pct),           d: momDelta(cur.margin_pct, baseline?.margin_pct),                    cmpVal: cmp ? fmtPct(cmp.margin_pct) : null,           accent: cur.margin_pct < 5 ? 'red' : cur.margin_pct < 10 ? 'amber' : 'green' },
+    { label: 'RTO Rate',       value: fmtPct(cur.rto_rate),             d: momDelta(cur.rto_rate, baseline?.rto_rate), lowerIsBetter: true,   cmpVal: cmp ? fmtPct(cmp.rto_rate) : null,             accent: cur.rto_rate > 25 ? 'red' : cur.rto_rate > 15 ? 'amber' : 'green' },
+    { label: 'Active Sellers', value: fmtNum(cur.active_sellers),       d: momDelta(cur.active_sellers, baseline?.active_sellers),             cmpVal: cmp ? fmtNum(cmp.active_sellers) : null,       accent: 'blue' },
   ]
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-7">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Executive Overview</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            {fmtMonth(cur.month)}{prev ? ` · compared to ${fmtMonth(prev.month)}` : ''}
+            {fmtMonth(cur.month)}
+            {cmp
+              ? <> · <span style={{ color:'#7c3aed' }}>comparing vs {fmtMonth(cmp.month)}</span></>
+              : prev ? ` · vs ${fmtMonth(prev.month)}` : ''
+            }
           </p>
         </div>
+        {cmp && (
+          <div className="flex items-center gap-3 text-xs" style={{ color:'var(--color-text-muted)' }}>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ background:'var(--color-primary)' }} />
+              {fmtMonth(cur.month)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm inline-block" style={{ background:'rgba(124,58,237,0.6)' }} />
+              {fmtMonth(cmp.month)}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-7">
-        {kpis.map(k => <KPICard key={k.label} {...k} />)}
+        {kpis.map(k => <KPICard key={k.label} {...k} compareMonth={cmp ? fmtMonth(cmp.month) : null} />)}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <ChartCard title="Monthly Orders">
-          <Bar data={{ labels, datasets: [{ label:'Orders', data: all.map(m => m.total_orders), backgroundColor:'#3b82f6', borderRadius:5 }] }}
-            options={barOpts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtNum(ctx.raw) } } } })} />
+        <ChartCard title="Monthly Orders" subtitle={cmp ? `${fmtMonth(cur.month)} vs ${fmtMonth(cmp.month)} highlighted` : undefined}>
+          <Bar data={{ labels, datasets: [
+            { label:'Orders', data: all.map(m => m.total_orders),
+              backgroundColor: all.map(m =>
+                m.month === selectedMonth ? '#2563eb' :
+                m.month === compareMonth  ? 'rgba(124,58,237,0.7)' : '#93c5fd'),
+              borderRadius: 5 }
+          ]}} options={barOpts({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => fmtNum(ctx.raw) } } } })} />
         </ChartCard>
+
+        <ChartCard title="Margin % Trend">
+          <Line data={{ labels, datasets: [
+            { label:`${fmtMonth(cur.month)} Margin %`, data: all.map(m => m.margin_pct),
+              borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)', fill:true, tension:0.35,
+              pointRadius: all.map(m => m.month === selectedMonth || m.month === compareMonth ? 6 : 3),
+              pointBackgroundColor: all.map(m => m.month === selectedMonth ? '#059669' : m.month === compareMonth ? '#7c3aed' : '#10b981'),
+            },
+          ]}} options={lineOpts({ scales: { y: { ticks: { callback: v => `${v}%` } } } })} />
+        </ChartCard>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <ChartCard title="Revenue vs Cost (₹L)">
           <Bar data={{ labels, datasets: [
-            { label:'Revenue', data: all.map(m => +(m.total_revenue_billed/100000).toFixed(2)), backgroundColor:'#3b82f6cc', borderRadius:5 },
-            { label:'Cost',    data: all.map(m => +(m.total_courier_cost/100000).toFixed(2)),   backgroundColor:'#f87171',   borderRadius:5 },
+            { label:'Revenue', data: all.map(m => +(m.total_revenue_billed/100000).toFixed(2)),
+              backgroundColor: all.map(m => m.month === selectedMonth ? '#2563eb' : m.month === compareMonth ? 'rgba(124,58,237,0.7)' : '#93c5fd'),
+              borderRadius:5 },
+            { label:'Cost', data: all.map(m => +(m.total_courier_cost/100000).toFixed(2)),
+              backgroundColor:'#fca5a5', borderRadius:5 },
           ]}} options={barOpts({ plugins: { legend: { display: true } } })} />
         </ChartCard>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <ChartCard title="Margin % Trend">
-          <Line data={{ labels, datasets: [{ label:'Margin %', data: all.map(m => m.margin_pct), borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)', fill:true, tension:0.35, pointRadius:4 }] }}
-            options={lineOpts({ scales: { y: { ticks: { callback: v => `${v}%` } } } })} />
-        </ChartCard>
         <ChartCard title="RTO Rate Trend">
-          <Line data={{ labels, datasets: [{ label:'RTO %', data: all.map(m => m.rto_rate), borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)', fill:true, tension:0.35, pointRadius:4 }] }}
-            options={lineOpts({ scales: { y: { ticks: { callback: v => `${v}%` } } } })} />
+          <Line data={{ labels, datasets: [
+            { label:'RTO %', data: all.map(m => m.rto_rate),
+              borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.08)', fill:true, tension:0.35,
+              pointRadius: all.map(m => m.month === selectedMonth || m.month === compareMonth ? 6 : 3),
+              pointBackgroundColor: all.map(m => m.month === selectedMonth ? '#dc2626' : m.month === compareMonth ? '#7c3aed' : '#ef4444'),
+            },
+          ]}} options={lineOpts({ scales: { y: { ticks: { callback: v => `${v}%` } } } })} />
         </ChartCard>
       </div>
 
@@ -136,33 +176,62 @@ export default function ExecutiveOverview() {
   )
 }
 
-function KPICard({ label, value, d, lowerIsBetter = false, accent = 'blue' }) {
+function KPICard({ label, value, d, lowerIsBetter = false, accent = 'blue', cmpVal = null, compareMonth = null }) {
   const isPositive = d > 0
-  const isGood = lowerIsBetter ? !isPositive : isPositive
+  const isGood     = lowerIsBetter ? !isPositive : isPositive
   const { bar, bg } = ACCENT[accent] ?? ACCENT.blue
+  const isComparing = !!cmpVal
+
   return (
     <div className="relative overflow-hidden rounded-xl p-5 card-hover"
-      style={{ background:'var(--color-surface)', border:'1px solid var(--color-border)', boxShadow:'var(--shadow-sm)' }}>
+      style={{
+        background:'var(--color-surface)',
+        border: isComparing ? '1px solid rgba(124,58,237,0.2)' : '1px solid var(--color-border)',
+        boxShadow:'var(--shadow-sm)',
+      }}>
       <div className="absolute left-0 top-4 bottom-4 w-0.5 rounded-r-full" style={{ background: bar }} />
       <div className="absolute inset-0 rounded-xl" style={{ background: bg }} />
       <div className="relative">
-        <p className="text-xs font-medium uppercase tracking-wide mb-2.5" style={{ color:'var(--color-text-muted)', letterSpacing:'0.06em' }}>{label}</p>
+        <p className="text-xs font-medium uppercase tracking-wide mb-2" style={{ color:'var(--color-text-muted)', letterSpacing:'0.06em' }}>{label}</p>
+
+        {/* Primary value */}
         <p className="text-2xl font-bold leading-none" style={{ color:'var(--color-text-primary)', fontVariantNumeric:'tabular-nums' }}>{value}</p>
-        {d !== null && d !== undefined && (
-          <p className={`flex items-center gap-1 mt-2.5 text-xs font-semibold ${isGood ? 'text-emerald-600' : 'text-red-500'}`}>
-            {isPositive ? '↑' : '↓'} {Math.abs(d).toFixed(1)}% vs last month
-          </p>
+
+        {/* Comparison row */}
+        {isComparing ? (
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs" style={{ color:'rgba(124,58,237,0.8)' }}>{cmpVal}</span>
+              <span className="text-xs" style={{ color:'var(--color-text-muted)' }}>{compareMonth}</span>
+            </div>
+            {d !== null && d !== undefined && (
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${isGood ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                {isPositive ? '+' : ''}{Math.abs(d).toFixed(1)}%
+              </span>
+            )}
+          </div>
+        ) : (
+          <>
+            {d !== null && d !== undefined && (
+              <p className={`flex items-center gap-1 mt-2.5 text-xs font-semibold ${isGood ? 'text-emerald-600' : 'text-red-500'}`}>
+                {isPositive ? '↑' : '↓'} {Math.abs(d).toFixed(1)}% vs last month
+              </p>
+            )}
+            {(d === null || d === undefined) && <p className="mt-2.5 text-xs" style={{ color:'var(--color-text-muted)' }}>First month</p>}
+          </>
         )}
-        {(d === null || d === undefined) && <p className="mt-2.5 text-xs" style={{ color:'var(--color-text-muted)' }}>First month</p>}
       </div>
     </div>
   )
 }
 
-function ChartCard({ title, children }) {
+function ChartCard({ title, subtitle, children }) {
   return (
     <div className="rounded-xl p-5" style={{ background:'var(--color-surface)', border:'1px solid var(--color-border)', boxShadow:'var(--shadow-sm)' }}>
-      <h3 className="text-sm font-semibold mb-4" style={{ color:'var(--color-text-secondary)' }}>{title}</h3>
+      <div className="mb-4">
+        <h3 className="text-sm font-semibold" style={{ color:'var(--color-text-secondary)' }}>{title}</h3>
+        {subtitle && <p className="text-xs mt-0.5" style={{ color:'var(--color-text-muted)' }}>{subtitle}</p>}
+      </div>
       {children}
     </div>
   )

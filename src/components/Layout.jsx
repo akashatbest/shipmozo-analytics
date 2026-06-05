@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { MonthSelector } from '../lib/monthContext'
+import { MonthRail } from '../lib/monthContext'
 import { useAuth } from '../lib/auth'
 
 const NAV_GROUPS = [
@@ -175,14 +175,14 @@ export default function Layout() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <MonthSelector />
-            <div className="flex items-center gap-2 text-xs font-medium" style={{ color: '#16a34a' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span className="hidden sm:inline">Connected</span>
-            </div>
+          <div className="flex items-center gap-2 text-xs font-medium" style={{ color: '#16a34a' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="hidden sm:inline">Connected</span>
           </div>
         </header>
+
+        {/* Month Timeline Rail */}
+        <MonthRail />
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto px-4 md:px-8 py-5 md:py-7 animate-fade-in">
