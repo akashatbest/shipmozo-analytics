@@ -125,7 +125,7 @@ export default function CourierPnL() {
           <table className="w-full text-sm">
             <Thead>
               <Th>Courier</Th><Th>Service Type</Th><Th right>Orders</Th>
-              <Th right>Revenue</Th><Th right>Margin %</Th><Th right>Avg Weight</Th><Th right>RTO %</Th>
+              <Th right>Revenue</Th><Th right>Margin ₹</Th><Th right>Margin %</Th><Th right>Avg Weight</Th><Th right>RTO %</Th>
             </Thead>
             <tbody className="divide-y" style={{ borderColor: 'var(--color-border-2)' }}>
               {serviceTypes.map((s, i) => (
@@ -139,6 +139,9 @@ export default function CourierPnL() {
                   <Td><span className="text-xs">{s.service_type}</span></Td>
                   <Td right>{fmtNum(s.orders)}</Td>
                   <Td right>{fmtINR(s.revenue_billed)}</Td>
+                  <td className={`px-4 py-3 text-right text-sm font-semibold ${(s.margin ?? 0) < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                    {fmtINR(s.margin)}
+                  </td>
                   <td className="px-4 py-3 text-right"><MarginBadge pct={s.margin_pct} /></td>
                   <Td right>{s.avg_weight?.toFixed(2)} kg</Td>
                   <Td right>{fmtPct(s.rto_rate)}</Td>
