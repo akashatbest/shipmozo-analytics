@@ -14,6 +14,8 @@ export default function CourierPnL() {
   const [loading, setLoading]           = useState(true)
   const [sortKey, setSortKey]           = useState(null)
   const [sortDir, setSortDir]           = useState('desc')
+  const [svcSortKey, setSvcSortKey]     = useState(null)
+  const [svcSortDir, setSvcSortDir]     = useState('desc')
 
   useEffect(() => {
     if (!month) return
@@ -54,6 +56,26 @@ export default function CourierPnL() {
       className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
       style={{ color: sortKey === col ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
       {children} {sortKey === col ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+    </th>
+  )
+
+  const sortedServiceTypes = svcSortKey
+    ? [...serviceTypes].sort((a, b) => {
+        const av = a[svcSortKey] ?? 0, bv = b[svcSortKey] ?? 0
+        return svcSortDir === 'desc' ? bv - av : av - bv
+      })
+    : serviceTypes
+
+  function toggleSvcSort(key) {
+    if (svcSortKey === key) setSvcSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSvcSortKey(key); setSvcSortDir('desc') }
+  }
+
+  const SvcSortTh = ({ col, children, right = false }) => (
+    <th onClick={() => toggleSvcSort(col)}
+      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
+      style={{ color: svcSortKey === col ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+      {children} {svcSortKey === col ? (svcSortDir === 'desc' ? '↓' : '↑') : ''}
     </th>
   )
 
@@ -152,11 +174,16 @@ export default function CourierPnL() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <Thead>
-              <Th>Courier</Th><Th>Service Type</Th><Th right>Orders</Th>
-              <Th right>Revenue</Th><Th right>Margin ₹</Th><Th right>Margin %</Th><Th right>Avg Weight</Th><Th right>RTO %</Th>
+              <Th>Courier</Th><Th>Service Type</Th>
+              <SvcSortTh col="orders" right>Orders</SvcSortTh>
+              <SvcSortTh col="revenue_billed" right>Revenue</SvcSortTh>
+              <SvcSortTh col="margin" right>Margin ₹</SvcSortTh>
+              <SvcSortTh col="margin_pct" right>Margin %</SvcSortTh>
+              <SvcSortTh col="avg_weight" right>Avg Weight</SvcSortTh>
+              <SvcSortTh col="rto_rate" right>RTO %</SvcSortTh>
             </Thead>
             <tbody className="divide-y" style={{ borderColor: 'var(--color-border-2)' }}>
-              {serviceTypes.map((s, i) => (
+              {sortedServiceTypes.map((s, i) => (
                 <tr key={i} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
