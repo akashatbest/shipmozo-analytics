@@ -12,6 +12,8 @@ export default function CourierPnL() {
   const [couriers, setCouriers]         = useState([])
   const [serviceTypes, setServiceTypes] = useState([])
   const [loading, setLoading]           = useState(true)
+  const [sortKey, setSortKey]           = useState(null)
+  const [sortDir, setSortDir]           = useState('desc')
 
   useEffect(() => {
     if (!month) return
@@ -34,6 +36,26 @@ export default function CourierPnL() {
   const negativeMargin = couriers.filter(c => c.margin_pct < 0)
   const labels = couriers.map(c => c.courier)
   const colors = labels.map(l => courierColor(l))
+
+  const sortedCouriers = sortKey
+    ? [...couriers].sort((a, b) => {
+        const av = a[sortKey] ?? 0, bv = b[sortKey] ?? 0
+        return sortDir === 'desc' ? bv - av : av - bv
+      })
+    : couriers
+
+  function toggleSort(key) {
+    if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    else { setSortKey(key); setSortDir('desc') }
+  }
+
+  const SortTh = ({ col, children, right = false }) => (
+    <th onClick={() => toggleSort(col)}
+      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}
+      style={{ color: sortKey === col ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+      {children} {sortKey === col ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+    </th>
+  )
 
   const EXPORT_COLS = [
     { key:'courier', label:'Courier' }, { key:'orders', label:'Orders' },
@@ -90,12 +112,18 @@ export default function CourierPnL() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <Thead>
-              <Th>Courier</Th><Th right>Orders</Th><Th right>Revenue</Th>
-              <Th right>Cost</Th><Th right>Margin</Th><Th right>Margin %</Th>
-              <Th right>Avg Charge</Th><Th right>Avg Weight</Th><Th right>RTO %</Th>
+              <Th>Courier</Th>
+              <SortTh col="orders" right>Orders</SortTh>
+              <SortTh col="revenue_billed" right>Revenue</SortTh>
+              <SortTh col="courier_cost" right>Cost</SortTh>
+              <SortTh col="margin" right>Margin</SortTh>
+              <SortTh col="margin_pct" right>Margin %</SortTh>
+              <SortTh col="avg_charge" right>Avg Charge</SortTh>
+              <SortTh col="avg_weight" right>Avg Weight</SortTh>
+              <SortTh col="rto_rate" right>RTO %</SortTh>
             </Thead>
             <tbody className="divide-y" style={{ borderColor: 'var(--color-border-2)' }}>
-              {couriers.map(c => (
+              {sortedCouriers.map(c => (
                 <tr key={c.courier} className="hover:bg-slate-50 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
