@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: '/shipmozo-analytics/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   build: {
     // Raise warning threshold (we know it's big; chunks below handle it)
